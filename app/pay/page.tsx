@@ -1,5 +1,7 @@
 'use client'
 
+export const dynamic = 'force-dynamic'
+
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { CheckCircle2, Loader2 } from 'lucide-react'
@@ -36,7 +38,6 @@ const PLANS = [
 
 export default function PayPage() {
   const router = useRouter()
-  const supabase = createClient()
 
   const [selectedPlan, setSelectedPlan] = useState<'student' | 'full'>('full')
   const [loading, setLoading] = useState(false)
@@ -46,6 +47,7 @@ export default function PayPage() {
 
   // Require login
   useEffect(() => {
+    const supabase = createClient()
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) {
         router.replace('/login?redirect=/pay')
@@ -53,7 +55,7 @@ export default function PayPage() {
         setCheckingAuth(false)
       }
     })
-  }, [router, supabase])
+  }, [router])
 
   // Auto-select student plan if scan data shows student
   useEffect(() => {

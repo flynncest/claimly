@@ -130,7 +130,7 @@ export default function PricingTabs() {
 
           {/* Content */}
           <div className="flex-1 px-6 py-5">
-            {'features' in plan ? (
+            {'features' in plan && plan.features ? (
               <div className="space-y-3.5">
                 {plan.features.map((f, i) => (
                   <div key={i} className="flex items-start gap-3">

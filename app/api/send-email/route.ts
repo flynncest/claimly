@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
 import type { AnalysisResult } from '@/lib/types'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
-
 function buildEmailHtml(result: AnalysisResult, reportUrl: string): string {
   const topPrograms = result.eligible_programs.slice(0, 3)
 
@@ -108,6 +106,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Email not configured' }, { status: 503 })
     }
 
+    const resend = new Resend(process.env.RESEND_API_KEY)
     const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://claimly.app'
     const reportUrl = `${appUrl}/report/${reportId}`
 
