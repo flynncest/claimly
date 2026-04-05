@@ -49,6 +49,19 @@ export type RentRange =
   | '1000_1200'
   | 'over_1200'
 
+export type ChildAgeGroup = '0_4' | '4_12' | '12_18'
+
+export type OpvangDaysPerWeek = '1_2' | '3_4' | '5'
+
+export type OpvangType = 'dagopvang' | 'bso' | 'both'
+
+export type HealthInsuranceCost =
+  | 'under_80'
+  | '80_100'
+  | '100_130'
+  | 'over_130'
+  | 'no_insurance'
+
 export interface ChildrenData {
   count: '1' | '2' | '3' | '4plus'
   paidChildcare: boolean
@@ -69,6 +82,26 @@ export interface ScanData {
   housing?: HousingData
   email?: string
   subscribeToUpdates?: boolean
+
+  // Detailed quiz fields (post-payment)
+  partnerLivingWithYou?: boolean
+  partnerEmployed?: boolean
+  partnerIncome?: IncomeRange
+  hasChildren?: boolean
+  childrenAgeGroups?: ChildAgeGroup[]
+  childrenOpvangDaysPerWeek?: OpvangDaysPerWeek
+  opvangType?: OpvangType
+  housingIsSocialHousing?: boolean
+  healthInsuranceCostMonthly?: HealthInsuranceCost
+
+  // Student quiz fields
+  enrolledAtDutchInstitution?: boolean
+  dutchHealthInsurance?: boolean
+  studentLivesAway?: boolean
+  duoStudiefinanciering?: boolean
+  bsnRegistered?: boolean
+
+  detailedQuizComplete?: boolean
 }
 
 export type EligibilityStatus =

@@ -192,27 +192,31 @@ const WW_BY_INCOME: Record<string, { min: number; max: number }> = {
 
 export function estimateBenefits(data: ScanData): BenefitsPreEstimate {
   const programs: ProgramEstimate[] = []
-  const country     = data.country     ?? 'NL'
-  const income      = data.income      ?? 'prefer_not'
-  const household   = data.household   ?? 'alone'
-  const employment  = data.employment  ?? 'employed_full'
-  const housing     = data.housing
-  const children    = data.children
+  const country      = data.country     ?? 'NL'
+  const income       = data.income      ?? 'prefer_not'
+  const household    = data.household   ?? 'alone'
+  const employment   = data.employment  ?? 'employed_full'
+  const housing      = data.housing
+  const children     = data.children
+  const isStudent    = employment === 'student' || data.residenceStatus === 'international_student'
 
-  const isCouple      = household === 'partner_no_kids' || household === 'two_parents'
+  const isCouple       = household === 'partner_no_kids' || household === 'two_parents'
   const isSingleParent = household === 'single_parent'
-  const hasKids       = isSingleParent || household === 'two_parents'
-  const childCount    = hasKids
+  const hasKids        = isSingleParent || household === 'two_parents'
+  const childCount     = hasKids
     ? (children?.count === '4plus' ? 4 : parseInt(children?.count ?? '1'))
     : 0
+
+  // Opvang days scale factor (1–2 days ≈ 45%, 3–4 days ≈ 75%, 5 days = 100%)
+  const opvangDays  = data.childrenOpvangDaysPerWeek
+  const daysScale   = opvangDays === '5' ? 1.0 : opvangDays === '3_4' ? 0.75 : opvangDays === '1_2' ? 0.45 : 1.0
 
   // ── NETHERLANDS ──────────────────────────────────────────────
   if (country === 'NL') {
 
-    // 1. Zorgtoeslag
-    // Single eligible up to 3000_3500; couple up to 3500_4500
+    // 1. Zorgtoeslag — skip if user explicitly has no Dutch health insurance
     const zorgThreshold = isCouple ? '3500_4500' : '3000_3500'
-    if (incomeAtOrBelow(income, zorgThreshold)) {
+    if (incomeAtOrBelow(income, zorgThreshold) && data.dutchHealthInsurance !== false) {
       const row = ZORGTOESLAG_BY_INCOME[income] ?? ZORGTOESLAG_BY_INCOME.prefer_not
       programs.push({
         program_id:   'zorgtoeslag',
@@ -225,11 +229,39 @@ export function estimateBenefits(data: ScanData): BenefitsPreEstimate {
       })
     }
 
-    // 2. Huurtoeslag
-    if (housing?.type === 'rent' && housing.rent) {
+    // 2. DUO Studiefinanciering — students enrolled at Dutch institution
+    if (isStudent && data.enrolledAtDutchInstitution !== false) {
+      // International students living abroad from parents → higher basisbeurs
+      const livesAway = data.studentLivesAway ?? (data.residenceStatus === 'international_student' ? true : undefined)
+      const basisbeurs = livesAway !== false ? 478 : 287
+      programs.push({
+        program_id:   'duo_studiefinanciering',
+        program_name: 'Student Finance',
+        dutch_name:   'DUO Studiefinanciering',
+        monthly_min:  basisbeurs,
+        monthly_max:  basisbeurs + 250, // supplementary grant potential
+        confidence:   'possible',
+        source: 'duo.nl',
+      })
+    }
+
+    // 3. OV-studentenkaart — included with DUO eligibility
+    if (isStudent && data.enrolledAtDutchInstitution !== false) {
+      programs.push({
+        program_id:   'ov_studentenkaart',
+        program_name: 'Free Travel Pass',
+        dutch_name:   'OV-studentenkaart',
+        monthly_min:  0,
+        monthly_max:  0, // travel benefit, not cash — shown as locked
+        confidence:   'possible',
+        source: 'duo.nl',
+      })
+    }
+
+    // 4. Huurtoeslag — non-students renting
+    if (!isStudent && housing?.type === 'rent' && housing.rent) {
       const grid = HUURTOESLAG_GRID[housing.rent]
       if (grid) {
-        // Single eligible up to 2500_3000; couple up to 3500_4500
         const huurThreshold = isCouple ? '3500_4500' : '2500_3000'
         const row = grid[income] as { min: number; max: number } | null
         if (row && incomeAtOrBelow(income, huurThreshold)) {
@@ -246,24 +278,23 @@ export function estimateBenefits(data: ScanData): BenefitsPreEstimate {
       }
     }
 
-    // 3. Kinderopvangtoeslag
+    // 5. Kinderopvangtoeslag — scaled by days per week
     if (hasKids && children?.paidChildcare) {
-      const row = KOT_BY_INCOME[income] ?? KOT_BY_INCOME.prefer_not
+      const row   = KOT_BY_INCOME[income] ?? KOT_BY_INCOME.prefer_not
       const scale = Math.min(childCount, 2)
       programs.push({
         program_id:   'kinderopvangtoeslag',
         program_name: 'Childcare Benefit',
         dutch_name:   'Kinderopvangtoeslag',
-        monthly_min:  Math.round(row.min * (scale > 1 ? 1.6 : 1)),
-        monthly_max:  Math.round(row.max * (scale > 1 ? 1.8 : 1)),
+        monthly_min:  Math.round(row.min * (scale > 1 ? 1.6 : 1) * daysScale),
+        monthly_max:  Math.round(row.max * (scale > 1 ? 1.8 : 1) * daysScale),
         confidence:   'likely',
         source: 'belastingdienst.nl',
       })
     }
 
-    // 4. Kindgebonden Budget
+    // 6. Kindgebonden Budget
     if (hasKids && childCount > 0) {
-      // Single parent threshold: 3000_3500; two parents: 3500_4500
       const kgbThreshold = isSingleParent ? '3000_3500' : '3500_4500'
       if (incomeAtOrBelow(income, kgbThreshold)) {
         const row = KGB_BY_INCOME[income] ?? KGB_BY_INCOME.prefer_not
@@ -271,12 +302,11 @@ export function estimateBenefits(data: ScanData): BenefitsPreEstimate {
           ? Math.round(row.base * row.single_multiplier)
           : row.base
         const max = perChild * childCount
-        const min = Math.round(max * 0.85)
         programs.push({
           program_id:   'kindgebonden_budget',
           program_name: 'Child Supplement',
           dutch_name:   'Kindgebonden Budget',
-          monthly_min:  min,
+          monthly_min:  Math.round(max * 0.85),
           monthly_max:  max,
           confidence:   income === 'prefer_not' ? 'possible' : 'likely',
           source: 'belastingdienst.nl',
@@ -284,22 +314,22 @@ export function estimateBenefits(data: ScanData): BenefitsPreEstimate {
       }
     }
 
-    // 5. WW-uitkering (only if unemployed)
-    if (employment === 'unemployed') {
+    // 7. WW-uitkering (unemployed non-students only)
+    if (employment === 'unemployed' && !isStudent) {
       const row = WW_BY_INCOME[income] ?? WW_BY_INCOME.prefer_not
       programs.push({
         program_id:   'ww_uitkering',
         program_name: 'Unemployment Benefit',
         dutch_name:   'WW-uitkering',
         monthly_min:  row.min,
-        monthly_max:  Math.min(row.max, 5640), // capped at max daily wage equivalent
+        monthly_max:  Math.min(row.max, 5640),
         confidence:   'possible',
         source: 'uwv.nl',
       })
     }
 
-    // 6. Bijstandsuitkering — last resort (unemployed + very low income)
-    if (employment === 'unemployed' && incomeAtOrBelow(income, '1500_2000')) {
+    // 8. Bijstandsuitkering — last resort
+    if (employment === 'unemployed' && !isStudent && incomeAtOrBelow(income, '1500_2000')) {
       programs.push({
         program_id:   'bijstandsuitkering',
         program_name: 'Social Assistance',
@@ -312,8 +342,9 @@ export function estimateBenefits(data: ScanData): BenefitsPreEstimate {
     }
   }
 
-  const total_min = programs.reduce((s, p) => s + p.monthly_min, 0)
-  const total_max = programs.reduce((s, p) => s + p.monthly_max, 0)
+  // Total excludes OV card (travel benefit, not cash)
+  const total_min = programs.filter(p => p.program_id !== 'ov_studentenkaart').reduce((s, p) => s + p.monthly_min, 0)
+  const total_max = programs.filter(p => p.program_id !== 'ov_studentenkaart').reduce((s, p) => s + p.monthly_max, 0)
 
   return { programs, total_min, total_max, country: 'NL' }
 }

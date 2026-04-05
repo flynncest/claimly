@@ -172,25 +172,93 @@ Respond ONLY with valid JSON matching this exact structure:
 Use program_id values: "duo_studiefinanciering", "ov_studentenkaart", "zorgtoeslag", "huurtoeslag", "kinderopvangtoeslag", "kindgebonden_budget", "ww_uitkering", "bijstandsuitkering".
 For OV-kaart, use estimated_monthly_min: 0, estimated_monthly_max: 0 (it is free travel, not cash).`
 
+function deriveHousehold(data: ScanData): string {
+  if (data.household) return data.household
+  if (data.partnerLivingWithYou && (data.hasChildren || data.children)) return 'two_parents'
+  if (data.partnerLivingWithYou) return 'partner_no_kids'
+  if (data.hasChildren || data.children) return 'single_parent'
+  return 'alone'
+}
+
 function buildUserPrompt(data: ScanData): string {
   const lines: string[] = [
     `Country: Netherlands`,
     `Residence status: ${data.residenceStatus ?? 'unknown'}`,
     `Employment: ${data.employment ?? 'unknown'}`,
     `Monthly net income: ${data.income ?? 'unknown'}`,
-    `Household: ${data.household ?? 'unknown'}`,
+    `Household: ${deriveHousehold(data)}`,
   ]
 
-  if (data.children) {
-    lines.push(`Children under 18: ${data.children.count === '4plus' ? '4+' : data.children.count}`)
-    lines.push(`Paid childcare: ${data.children.paidChildcare ? 'Yes' : 'No'}`)
+  // Partner
+  if (data.partnerLivingWithYou !== undefined) {
+    lines.push(`Partner living at same address: ${data.partnerLivingWithYou ? 'Yes' : 'No'}`)
+  }
+  if (data.partnerEmployed !== undefined) {
+    lines.push(`Partner employed: ${data.partnerEmployed ? 'Yes' : 'No'}`)
+  }
+  if (data.partnerIncome) {
+    lines.push(`Partner monthly net income: ${data.partnerIncome}`)
   }
 
+  // Children
+  if (data.hasChildren === false) {
+    lines.push(`Children under 18: None`)
+  } else if (data.hasChildren || data.children) {
+    if (data.children?.count) {
+      lines.push(`Number of children under 18: ${data.children.count === '4plus' ? '4+' : data.children.count}`)
+    }
+    if (data.childrenAgeGroups?.length) {
+      const ageLabels: Record<string, string> = { '0_4': '0–4 yrs', '4_12': '4–12 yrs', '12_18': '12–18 yrs' }
+      lines.push(`Children age groups: ${data.childrenAgeGroups.map(g => ageLabels[g] ?? g).join(', ')}`)
+    }
+    if (data.children?.paidChildcare !== undefined) {
+      lines.push(`Paid childcare (opvang): ${data.children.paidChildcare ? 'Yes' : 'No'}`)
+    }
+    if (data.childrenOpvangDaysPerWeek) {
+      const daysLabel: Record<string, string> = { '1_2': '1–2 days/week', '3_4': '3–4 days/week', '5': '5 days/week' }
+      lines.push(`Childcare days per week: ${daysLabel[data.childrenOpvangDaysPerWeek] ?? data.childrenOpvangDaysPerWeek}`)
+    }
+    if (data.opvangType) {
+      const typeLabel: Record<string, string> = { dagopvang: 'Dagopvang (daycare)', bso: 'BSO (after-school)', both: 'Both dagopvang + BSO' }
+      lines.push(`Childcare type: ${typeLabel[data.opvangType] ?? data.opvangType}`)
+    }
+  }
+
+  // Housing
   if (data.housing) {
     lines.push(`Housing type: ${data.housing.type}`)
     if (data.housing.rent) {
-      lines.push(`Monthly rent: ${data.housing.rent}`)
+      lines.push(`Monthly rent range: ${data.housing.rent}`)
     }
+  }
+  if (data.housingIsSocialHousing !== undefined) {
+    lines.push(`Social housing (woningcorporatie): ${data.housingIsSocialHousing ? 'Yes' : 'No'}`)
+  }
+
+  // Health insurance
+  if (data.healthInsuranceCostMonthly) {
+    const costLabel: Record<string, string> = {
+      under_80: 'Under €80/mo',
+      '80_100': '€80–100/mo',
+      '100_130': '€100–130/mo',
+      over_130: 'Over €130/mo',
+      no_insurance: 'No Dutch health insurance',
+    }
+    lines.push(`Monthly health insurance cost: ${costLabel[data.healthInsuranceCostMonthly] ?? data.healthInsuranceCostMonthly}`)
+  }
+
+  // Student-specific
+  if (data.enrolledAtDutchInstitution !== undefined) {
+    lines.push(`Enrolled at Dutch accredited institution (MBO/HBO/WO): ${data.enrolledAtDutchInstitution ? 'Yes' : 'No'}`)
+  }
+  if (data.dutchHealthInsurance !== undefined) {
+    lines.push(`Has Dutch basic health insurance: ${data.dutchHealthInsurance ? 'Yes' : 'No'}`)
+  }
+  if (data.duoStudiefinanciering !== undefined) {
+    lines.push(`Currently receiving DUO studiefinanciering: ${data.duoStudiefinanciering ? 'Yes' : 'No'}`)
+  }
+  if (data.bsnRegistered !== undefined) {
+    lines.push(`Registered at Dutch address (BRP/gemeente): ${data.bsnRegistered ? 'Yes' : 'No'}`)
   }
 
   return `Please analyse this person's benefit eligibility for Netherlands programs:\n\n${lines.join('\n')}`

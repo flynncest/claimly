@@ -6,14 +6,15 @@ import { estimateBenefits } from '@/lib/benefitsDb'
 import type { ScanData } from '@/lib/types'
 
 const MESSAGES = [
-  'Checking Healthcare Allowance (Zorgtoeslag) eligibility...',
-  'Analyzing Rent Benefit (Huurtoeslag) qualification...',
-  'Scanning child benefit programs...',
-  'Checking unemployment benefit eligibility...',
-  'Scanning 6 federal benefit programs...',
-  'Calculating your potential monthly value...',
-  'Cross-referencing 2025/2026 income thresholds...',
-  'Preparing your personal report...',
+  'Checking Zorgtoeslag...',
+  'Checking Huurtoeslag...',
+  'Checking Kinderopvangtoeslag...',
+  'Checking Kindgebonden Budget...',
+  'Checking WW-uitkering...',
+  'Checking Bijstandsuitkering...',
+  'Checking DUO Studiefinanciering...',
+  'Checking OV-studentenkaart...',
+  'Calculating monthly total...',
 ]
 
 function CircularProgress({ pct }: { pct: number }) {

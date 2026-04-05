@@ -78,7 +78,7 @@ export default function Navbar() {
               {/* Language toggle */}
               <div className="flex items-center gap-0.5 border border-navy/12 rounded-lg px-1.5 py-1">
                 <Globe size={11} className="text-navy/30 mr-1" />
-                {['EN', 'NL', 'FR'].map((lang) => (
+                {['EN', 'NL'].map((lang) => (
                   <button
                     key={lang}
                     onClick={() => handleLangClick(lang)}
