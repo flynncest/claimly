@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import type { ScanData } from '@/lib/types'
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-
 const SYSTEM_PROMPT = `You are an expert benefits eligibility advisor specialising in Dutch government benefit programs. You have deep knowledge of the 2025/2026 eligibility rules for all major Netherlands programs.
 
 Your task is to analyse a user's profile and determine which benefit programs they qualify for. Be accurate and conservative — only mark "likely_eligible" when you have high confidence. Use "possibly_eligible" for borderline cases. Use "check_manually" when eligibility cannot be determined from the intake.
@@ -214,6 +212,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing profile data' }, { status: 400 })
     }
 
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
     const studentMode = isStudent(scanData)
     const systemPrompt = studentMode ? STUDENT_SYSTEM_PROMPT : SYSTEM_PROMPT
     const userPrompt = buildUserPrompt(scanData)

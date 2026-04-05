@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import type { AnalysisResult, ScanData } from '@/lib/types'
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-
 const FACTCHECK_SYSTEM_PROMPT = `You are an independent fact-checker reviewing AI-generated Dutch and Belgian government benefits eligibility results. Your job is to verify each eligible program's determination against official 2025/2026 rules.
 
 ## NETHERLANDS PROGRAMS — OFFICIAL 2025/2026 RULES
@@ -95,6 +93,8 @@ export async function POST(req: NextRequest) {
   try {
     const body: { analysis: AnalysisResult; scanData: ScanData } = await req.json()
     const { analysis, scanData } = body
+
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
     if (!analysis?.eligible_programs?.length) {
       return NextResponse.json({})
