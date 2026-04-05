@@ -53,31 +53,32 @@ export default function ResultsPage() {
           <div className="fade-up bg-[#C8BFB0] rounded-card p-6 mb-8 border border-navy/8" style={{ animationDelay: '0.1s' }}>
             <div className="flex items-center gap-3 mb-2">
               <TrendingUp size={20} className="text-brand/70" />
-              <p className="text-navy/55 text-sm">You may be eligible for up to</p>
+              <p className="text-navy/55 text-sm">Estimated monthly total</p>
             </div>
             <p className="font-serif text-4xl sm:text-5xl text-brand mb-2">
-              €{estimate.total_max}
+              €{estimate.total_min}–€{estimate.total_max}
               <span className="text-2xl text-navy/35">/month</span>
             </p>
             <p className="text-navy/45 text-xs">
-              Conservative estimate: €{estimate.total_min}/mo · Rule-based pre-screening
+              Based on your answers · Exact per-program amounts in your full report
             </p>
           </div>
         ) : (
-          <div className="fade-up bg-brand-50 border border-brand/20 rounded-card p-5 mb-8" style={{ animationDelay: '0.1s' }}>
+          <div className="fade-up bg-brand/6 border border-brand/20 rounded-card p-5 mb-8" style={{ animationDelay: '0.1s' }}>
             <p className="text-brand text-sm">
-              Based on your answers, standard programs may not apply — but an AI-verified check can find edge cases and less obvious benefits.
+              Standard programs may not apply — but an AI-verified check can find edge cases and less obvious benefits.
             </p>
           </div>
         )}
 
-        {/* Program list — visible but not detailed */}
+        {/* Program list — teaser only, no amounts */}
         {estimate.programs.length > 0 && (
           <div className="fade-up mb-6" style={{ animationDelay: '0.15s' }}>
-            <h2 className="font-serif text-xl text-navy mb-4">
-              Programs that may apply ({estimate.programs.length})
+            <h2 className="font-serif text-xl text-navy mb-1">
+              {estimate.programs.length} program{estimate.programs.length > 1 ? 's' : ''} you likely qualify for
             </h2>
-            <div className="space-y-3">
+            <p className="text-navy/45 text-sm mb-4">Exact amounts calculated in your full report</p>
+            <div className="space-y-2.5">
               {estimate.programs.map((p) => (
                 <div
                   key={p.program_id}
@@ -90,11 +91,9 @@ export default function ResultsPage() {
                       <p className="text-xs text-navy/40">{p.dutch_name}</p>
                     </div>
                   </div>
-                  <div className="text-right shrink-0">
-                    <p className="font-serif text-lg text-brand">
-                      €{p.monthly_min}–€{p.monthly_max}
-                    </p>
-                    <p className="text-xs text-navy/40">/month</p>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Lock size={12} className="text-navy/30" />
+                    <span className="text-xs text-navy/30 font-medium">Amount locked</span>
                   </div>
                 </div>
               ))}
@@ -133,14 +132,14 @@ export default function ResultsPage() {
               Unlock your full AI-verified report
             </h3>
             <p className="text-navy/55 text-sm leading-relaxed mb-5">
-              Get a complete analysis with step-by-step application guides, exact conditions, and monthly monitoring — starting from €13.99/month.
+              See the exact monthly amount for each program, why you qualify, and a direct link to apply on the official Dutch government site.
             </p>
 
             <div className="space-y-3">
               {[
-                'AI-verified eligibility for all 9+ programs',
+                'Exact income-based amounts per program',
                 'Step-by-step application instructions',
-                'Monthly alerts when rules change',
+                'Why you qualify (or don\'t) — explained in English',
               ].map((f) => (
                 <div key={f} className="flex items-center gap-2.5 text-sm text-navy/70">
                   <CheckCircle2 size={14} className="text-brand shrink-0" />
