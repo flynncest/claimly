@@ -36,9 +36,9 @@ function buildEmailHtml(result: AnalysisResult, reportUrl: string): string {
           <table cellpadding="0" cellspacing="0">
             <tr>
               <td style="background-color: #E8440A; border-radius: 8px; width: 32px; height: 32px; text-align: center; vertical-align: middle;">
-                <span style="color: white; font-weight: bold; font-size: 16px;">C</span>
+                <span style="color: white; font-weight: bold; font-size: 11px;">DC</span>
               </td>
-              <td style="padding-left: 10px; font-size: 20px; font-weight: 600; color: #0D1B2A;">Claimly</td>
+              <td style="padding-left: 10px; font-size: 20px; font-weight: 600; color: #0D1B2A;">DutchClaim</td>
             </tr>
           </table>
         </td></tr>
@@ -83,7 +83,7 @@ function buildEmailHtml(result: AnalysisResult, reportUrl: string): string {
           <p style="margin: 0; font-size: 11px; color: #9CA3AF; line-height: 1.6;">
             These results are estimates based on your answers and 2025/2026 eligibility rules.
             Always verify your eligibility with official government sources before applying.
-            Claimly is not affiliated with any government body.
+            DutchClaim is not affiliated with any government body.
           </p>
         </td></tr>
 
@@ -107,13 +107,13 @@ export async function POST(req: NextRequest) {
     }
 
     const resend = new Resend(process.env.RESEND_API_KEY)
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://claimly.app'
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://dutchclaim.app'
     const reportUrl = `${appUrl}/report/${reportId}`
 
     const from = process.env.RESEND_FROM_EMAIL ?? 'onboarding@resend.dev'
 
     const { error } = await resend.emails.send({
-      from: `Claimly <${from}>`,
+      from: `DutchClaim <${from}>`,
       to: email,
       subject: `Your benefits report — up to €${result.total_monthly_max}/month`,
       html: buildEmailHtml(result, reportUrl),

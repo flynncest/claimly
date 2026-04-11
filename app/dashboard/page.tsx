@@ -8,13 +8,14 @@ import {
 } from 'lucide-react'
 import { createClient } from '@/lib/supabaseServer'
 import type { EligibilityStatus, SavedReport } from '@/lib/types'
-import AutoAnalyzer from './AutoAnalyzer'
 import DashboardEmptyState from './DashboardEmptyState'
 import UpdateAnswersButton from './UpdateAnswersButton'
+import ReportSwitcher from './ReportSwitcher'
 
 const RESIDENCE_LABELS: Record<string, string> = {
   dutch_national: 'Dutch national',
   eu_eea_citizen: 'EU / EEA citizen',
+  permanent_resident: 'Permanent resident',
   highly_skilled_migrant: 'Highly Skilled Migrant (Kennismigrant)',
   international_student: 'International student',
   work_permit: 'Other work permit',
@@ -31,6 +32,7 @@ const EMPLOYMENT_LABELS: Record<string, string> = {
   student: 'Student', other: 'Other',
 }
 const INCOME_LABELS: Record<string, string> = {
+  no_income: 'No job income (grants/DUO only)', under_500: 'Under €500/mo (bijbaan)',
   under_1000: 'Under €1,000/mo', '1000_1500': '€1,000–€1,500/mo',
   '1500_2000': '€1,500–€2,000/mo', '2000_2500': '€2,000–€2,500/mo',
   '2500_3000': '€2,500–€3,000/mo', '3000_3500': '€3,000–€3,500/mo',
@@ -73,7 +75,11 @@ const STATUS_CONFIG: Record<EligibilityStatus, { label: string; color: string; b
   },
 }
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: { reportId?: string }
+}) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
@@ -90,7 +96,12 @@ export default async function DashboardPage() {
 
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login?redirect=/dashboard')
+  if (!user) {
+    const next = searchParams.reportId
+      ? `/dashboard?reportId=${searchParams.reportId}`
+      : '/dashboard'
+    redirect(`/login?redirect=${encodeURIComponent(next)}`)
+  }
 
   await supabase
     .from('scan_results')
@@ -98,14 +109,52 @@ export default async function DashboardPage() {
     .eq('email', user.email ?? '')
     .is('user_id', null)
 
-  const { data: reports } = await supabase
+  // Also try to catch reports saved before the user was logged in
+  // (saved by email match during the anonymous pay flow)
+  let { data: allReports, error: reportError } = await supabase
     .from('scan_results')
-    .select('id, created_at, country, result, scan_data')
+    .select('id, created_at, country, result, scan_data, name')
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
-    .limit(1)
+    .limit(50)
 
-  const report = reports?.[0] as SavedReport | undefined
+  // If the query failed (e.g. 'name' column not yet migrated), retry without it
+  if (reportError) {
+    const fallback = await supabase
+      .from('scan_results')
+      .select('id, created_at, country, result, scan_data')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(50)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    allReports = (fallback.data as any) ?? null
+  }
+
+  let reports = (allReports ?? []) as SavedReport[]
+
+  // If a specific reportId is in the URL but not yet in the list (e.g. just generated,
+  // or user_id claim hasn't propagated), fetch it directly by ID and claim it.
+  const activeReportId = searchParams.reportId
+  if (activeReportId && !reports.find(r => r.id === activeReportId)) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: directRow } = await supabase
+      .from('scan_results')
+      .select('id, created_at, country, result, scan_data, name')
+      .eq('id', activeReportId)
+      .single() as { data: (SavedReport & { user_id?: string | null }) | null }
+    if (directRow) {
+      // Claim it: set user_id so it appears next time too
+      if (!directRow.user_id) {
+        await supabase
+          .from('scan_results')
+          .update({ user_id: user.id })
+          .eq('id', activeReportId)
+      }
+      reports = [directRow as SavedReport, ...reports]
+    }
+  }
+
+  const report = reports.find(r => r.id === activeReportId) ?? reports[0]
   const hasReport = !!report
 
   const EDIT_COOLDOWN_DAYS = 30
@@ -121,7 +170,6 @@ export default async function DashboardPage() {
   return (
     <div className="bg-white min-h-screen py-10 px-4">
       <div className="max-w-2xl mx-auto">
-        <AutoAnalyzer hasReports={hasReport} />
 
         {/* Header */}
         <div className="flex items-start justify-between gap-4 mb-8">
@@ -131,6 +179,10 @@ export default async function DashboardPage() {
           </div>
           {hasReport && <UpdateAnswersButton canEdit={canEdit} nextEditDate={nextEditDate} />}
         </div>
+
+        {reports.length > 0 && (
+          <ReportSwitcher reports={reports} activeId={report?.id ?? ''} />
+        )}
 
         {!hasReport ? (
           <DashboardEmptyState />
@@ -229,12 +281,21 @@ export default async function DashboardPage() {
                               <p className="text-navy/55 text-sm leading-relaxed">{p.explanation}</p>
                             </div>
                             <div className="shrink-0 text-right">
-                              <p className="font-serif text-2xl text-brand leading-none">
-                                €{p.estimated_monthly_min === p.estimated_monthly_max
-                                  ? p.estimated_monthly_max
-                                  : `${p.estimated_monthly_min}–${p.estimated_monthly_max}`}
-                              </p>
-                              <p className="text-xs text-navy/35 mt-0.5">/month</p>
+                              {p.program_id === 'ov_studentenkaart' ? (
+                                <>
+                                  <p className="font-serif text-xl text-brand leading-none">Eligible</p>
+                                  <p className="text-xs text-navy/35 mt-0.5">free travel</p>
+                                </>
+                              ) : (
+                                <>
+                                  <p className="font-serif text-2xl text-brand leading-none">
+                                    €{p.estimated_monthly_min === p.estimated_monthly_max
+                                      ? p.estimated_monthly_max
+                                      : `${p.estimated_monthly_min}–${p.estimated_monthly_max}`}
+                                  </p>
+                                  <p className="text-xs text-navy/35 mt-0.5">/month</p>
+                                </>
+                              )}
                             </div>
                           </div>
 

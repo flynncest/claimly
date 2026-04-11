@@ -8,7 +8,7 @@ const VALUE_PROPS = [
   {
     icon: <Clock size={20} />,
     title: 'Cut repetitive admin questions',
-    desc: 'New international joiners always ask "what benefits am I entitled to?" Claimly answers it automatically, before they ask you.',
+    desc: 'New international joiners always ask "what benefits am I entitled to?" DutchClaim answers it automatically, before they ask you.',
   },
   {
     icon: <TrendingUp size={20} />,
@@ -18,7 +18,7 @@ const VALUE_PROPS = [
   {
     icon: <Users size={20} />,
     title: 'Built for fast-growing teams',
-    desc: 'If you hire 5–10 international employees per month, the benefits questions stack up fast. Claimly scales with your intake.',
+    desc: 'If you hire 5–10 international employees per month, the benefits questions stack up fast. DutchClaim scales with your intake.',
   },
   {
     icon: <Shield size={20} />,
@@ -62,7 +62,7 @@ export default function HRPage() {
             </h1>
             <p className="text-white/65 text-lg leading-relaxed mb-8">
               If you&apos;re onboarding international talent monthly — like ASML, Adyen,
-              or Booking.com-sized scaleups do — Claimly for Teams handles the
+              or Booking.com-sized scaleups do — DutchClaim for Teams handles the
               &ldquo;what benefits am I entitled to?&rdquo; question automatically, in English,
               before your new hire sends the Slack message.
             </p>
@@ -118,7 +118,7 @@ export default function HRPage() {
           <div className="grid md:grid-cols-4 gap-6">
             {[
               { step: '01', title: 'Set up your account', desc: 'Upload your company logo, add team members, and configure your branded report template.' },
-              { step: '02', title: 'Invite employees', desc: "Send a personalized Claimly link to each new hire with one click from your HR dashboard." },
+              { step: '02', title: 'Invite employees', desc: "Send a personalized DutchClaim link to each new hire with one click from your HR dashboard." },
               { step: '03', title: 'They scan in minutes', desc: "Your employee answers 8 questions and receives a personalized benefits report instantly." },
               { step: '04', title: 'You see the results', desc: "Track who has scanned, their eligibility status, and aggregate benefit data across your team." },
             ].map((s, i) => (
@@ -169,7 +169,7 @@ export default function HRPage() {
               <p className="text-brand font-serif text-4xl mb-2">€299</p>
               <p className="text-white/50 text-sm mb-5">/month · unlimited employees</p>
               <div className="space-y-3 text-sm text-white/70 mb-6">
-                <p>For a team of 20 international hires each missing €3,200/year, Claimly pays for itself <span className="text-white font-medium">18× over</span> — plus you eliminate dozens of HR hours fielding the same questions.</p>
+                <p>For a team of 20 international hires each missing €3,200/year, DutchClaim pays for itself <span className="text-white font-medium">18× over</span> — plus you eliminate dozens of HR hours fielding the same questions.</p>
               </div>
               <a href="#demo" className="btn-primary block text-center bg-brand text-white font-medium py-3 rounded-input text-sm">
                 Request a Demo

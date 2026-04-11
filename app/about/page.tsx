@@ -30,7 +30,7 @@ export default function AboutPage() {
               because they weren&apos;t told.
             </p>
             <p>
-              Claimly fixes that. We&apos;ve built an AI trained on the complete
+              DutchClaim fixes that. We&apos;ve built an AI trained on the complete
               2025/2026 eligibility rules for every major NL and BE benefit
               program. You answer 8 questions. We tell you exactly what you
               qualify for, how much to expect, and link you directly to apply —

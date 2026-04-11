@@ -23,9 +23,9 @@ export default function UpdateAnswersButton({
 
   const handleClick = () => {
     // Signal AutoAnalyzer to re-run even though user has existing reports
-    localStorage.setItem('claimly_paid', 'true')
-    localStorage.removeItem('claimly_scan_data')
-    localStorage.removeItem('claimly_scan_step')
+    localStorage.setItem('dutchclaim_paid', 'true')
+    localStorage.removeItem('dutchclaim_scan_data')
+    localStorage.removeItem('dutchclaim_scan_step')
     router.push('/scan')
   }
 

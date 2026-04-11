@@ -90,9 +90,9 @@ function LoginForm() {
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-2 mb-6">
             <div className="w-8 h-8 bg-brand rounded-lg flex items-center justify-center">
-              <span className="text-white font-serif font-bold">C</span>
+              <span className="text-white font-serif font-bold text-sm leading-none">€</span>
             </div>
-            <span className="font-serif text-xl text-navy">Claimly</span>
+            <span className="font-serif text-xl text-navy">DutchClaim</span>
           </Link>
           <h1 className="font-serif text-2xl text-navy mb-1">
             {mode === 'signup' ? 'Create your account' : 'Welcome back'}

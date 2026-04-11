@@ -8,9 +8,9 @@ export default function Footer() {
           <div className="col-span-2">
             <div className="flex items-center gap-2 mb-4">
               <div className="w-7 h-7 bg-brand rounded-lg flex items-center justify-center">
-                <span className="text-white font-serif font-bold text-sm">C</span>
+                <span className="text-white font-serif font-bold text-sm leading-none">€</span>
               </div>
-              <span className="font-serif text-lg text-navy">Claimly</span>
+              <span className="font-serif text-lg text-navy">DutchClaim</span>
             </div>
             <p className="text-sm leading-relaxed text-navy/40 max-w-xs">
               Find every benefit you&apos;re entitled to in the Netherlands — in English, in minutes.
@@ -24,7 +24,7 @@ export default function Footer() {
               <li><Link href="/scan" className="hover:text-navy transition-colors">Benefits Scan</Link></li>
               <li><Link href="/#pricing" className="hover:text-navy transition-colors">Pricing</Link></li>
               <li><Link href="/students" className="hover:text-navy transition-colors">For Students</Link></li>
-              <li><Link href="/expat" className="hover:text-navy transition-colors">For Expats</Link></li>
+              <li><Link href="/workers" className="hover:text-navy transition-colors">For Workers</Link></li>
             </ul>
           </div>
 
@@ -32,8 +32,9 @@ export default function Footer() {
             <h4 className="text-navy/65 text-xs font-semibold uppercase tracking-wider mb-4">Company</h4>
             <ul className="space-y-2.5 text-sm">
               <li><Link href="/about" className="hover:text-navy transition-colors">About</Link></li>
+              <li><Link href="/faq" className="hover:text-navy transition-colors">FAQ</Link></li>
               <li><Link href="/login" className="hover:text-navy transition-colors">Log in</Link></li>
-              <li><a href="mailto:hello@claimly.app" className="hover:text-navy transition-colors">Contact</a></li>
+              <li><a href="mailto:info@dutchclaim.com" className="hover:text-navy transition-colors">Contact</a></li>
             </ul>
           </div>
 
@@ -49,7 +50,7 @@ export default function Footer() {
 
         <div className="border-t border-navy/10 pt-6 flex flex-col sm:flex-row justify-between items-center gap-3">
           <p className="text-xs text-navy/30">
-            © {new Date().getFullYear()} Claimly. Not affiliated with any government body.
+            © {new Date().getFullYear()} DutchClaim. Not affiliated with any government body.
           </p>
           <p className="text-xs text-navy/30">
             Results are estimates. Always verify with official sources.

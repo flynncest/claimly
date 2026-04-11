@@ -10,14 +10,14 @@ const PLANS = [
     cta: 'Start free scan',
     href: '/scan',
     popular: false,
-    description: 'Not sure if you qualify? Get an instant estimate in under 2 minutes — no account, no AI, no payment.',
+    description: 'Start here. See in 60 seconds whether there\'s money waiting for you — before you pay a cent.',
     features: [
       { icon: <Zap size={14} />, text: 'Instant eligibility estimate across all 6 NL programs' },
       { icon: <CheckCircle2 size={14} />, text: 'Estimated monthly range based on your answers' },
       { icon: <CheckCircle2 size={14} />, text: 'Fact-checked against 2025/2026 government rules' },
       { icon: <CheckCircle2 size={14} />, text: 'No account required — results shown immediately' },
     ],
-    note: 'Upgrade to unlock AI-verified amounts and step-by-step guidance.',
+    note: 'Upgrade to unlock exact amounts and step-by-step application guidance.',
   },
   {
     id: 'student',
@@ -27,7 +27,7 @@ const PLANS = [
     cta: 'Get student report',
     href: '/scan',
     popular: false,
-    description: 'The 3 programs every international student in the Netherlands can claim — AI-checked against your exact situation.',
+    description: 'Most international students at Dutch universities are entitled to DUO grants, free travel, and healthcare support — and claim none of it. This report tells you exactly what\'s yours and how to get it before the deadlines pass.',
     forWho: ['EU/EEA students', 'International students', 'Part-time student workers'],
     programs: [
       {
@@ -48,20 +48,20 @@ const PLANS = [
     ],
   },
   {
-    id: 'expat',
-    label: 'Expat',
+    id: 'worker',
+    label: 'Worker',
     price: '€19.99',
     priceNote: 'one-time',
-    cta: 'Get expat report',
+    cta: 'Get worker report',
     href: '/scan',
     popular: true,
-    description: 'All 6 Dutch programs fully verified. Most expats miss €3,200+ per year — find every euro you\'re entitled to.',
-    forWho: ['Kennismigrant', 'EU worker', 'ZZP / freelancer', 'Expat partner', 'Non-EU permit holder'],
+    description: 'The average international worker in NL misses €3,200 a year. This report finds every program you qualify for, tells you exactly how much each pays, and shows you how to claim it — in English, step by step. One payment. Yours forever.',
+    forWho: ['Kennismigrant', 'EU worker', 'ZZP / freelancer', 'Partner visa', 'Non-EU permit holder'],
     programs: [
       {
         icon: '🏥',
         name: 'Zorgtoeslag',
-        hook: 'Hundreds of euros a year — most expats pay full price without realising they don\'t have to',
+        hook: 'Hundreds of euros a year — most international workers pay full price without realising they don\'t have to',
       },
       {
         icon: '🏠',

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ChevronLeft, CheckCircle2 } from 'lucide-react'
+import { createClient } from '@/lib/supabase'
 import type {
   ScanData,
   ResidenceStatus,
@@ -22,30 +23,35 @@ type ScanStep =
   | 'student_enrolled'
   | 'student_living'
   | 'student_health'
-  // Expat steps
+  // Worker steps
   | 'residence'
   | 'employment'
+  | 'job_loss_reason'
+  | 'work_history'
+  | 'health_insurance'
   // Shared
   | 'income'
   | 'household'
   | 'children'
-  | 'children_opvang_days'
   | 'housing'
   | 'email'
 
 function getNextStep(step: ScanStep, data: ScanData, plan: Plan): ScanStep | null {
   const hasKids = data.household === 'single_parent' || data.household === 'two_parents'
+  const isUnemployed = data.employment === 'unemployed'
   switch (step) {
     case 'plan':                return plan === 'student' ? 'student_enrolled' : 'residence'
     case 'student_enrolled':    return 'student_living'
     case 'student_living':      return 'student_health'
     case 'student_health':      return 'income'
     case 'residence':           return 'employment'
-    case 'employment':          return 'income'
-    case 'income':              return plan === 'student' ? 'email' : 'household'
+    case 'employment':          return isUnemployed ? 'job_loss_reason' : 'income'
+    case 'job_loss_reason':     return 'work_history'
+    case 'work_history':        return 'income'
+    case 'income':              return plan === 'student' ? 'email' : 'health_insurance'
+    case 'health_insurance':    return 'household'
     case 'household':           return hasKids ? 'children' : 'housing'
-    case 'children':            return data.children?.paidChildcare ? 'children_opvang_days' : 'housing'
-    case 'children_opvang_days': return 'housing'
+    case 'children':            return 'housing'
     case 'housing':             return 'email'
     case 'email':               return null
   }
@@ -118,26 +124,50 @@ export default function ScanPage() {
   const [plan, setPlan] = useState<Plan>('full')
   const [data, setData] = useState<ScanData>({ country: 'NL' })
   const [history, setHistory] = useState<ScanStep[]>(['plan'])
+  const [userEmail, setUserEmail] = useState<string | null>(null)
 
   const currentStep = history[history.length - 1]
 
+  // Check if user is already logged in
   useEffect(() => {
-    const savedData = localStorage.getItem('claimly_scan_data')
-    const savedPlan = localStorage.getItem('claimly_scan_plan') as Plan | null
-    const savedHistory = localStorage.getItem('claimly_scan_history')
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    if (!supabaseUrl || !supabaseKey) return
+    createClient().auth.getSession().then(({ data: { session } }) => {
+      if (session?.user?.email) setUserEmail(session.user.email)
+    })
+  }, [])
+
+  useEffect(() => {
+    const savedData = localStorage.getItem('dutchclaim_scan_data')
+    const savedPlan = localStorage.getItem('dutchclaim_scan_plan') as Plan | null
+    const savedHistory = localStorage.getItem('dutchclaim_scan_history')
     if (savedData) setData({ ...JSON.parse(savedData), country: 'NL' })
     if (savedPlan) setPlan(savedPlan)
     if (savedHistory) setHistory(JSON.parse(savedHistory))
   }, [])
 
   useEffect(() => {
-    localStorage.setItem('claimly_scan_data', JSON.stringify(data))
-    localStorage.setItem('claimly_scan_plan', plan)
-    localStorage.setItem('claimly_scan_history', JSON.stringify(history))
+    localStorage.setItem('dutchclaim_scan_data', JSON.stringify(data))
+    localStorage.setItem('dutchclaim_scan_plan', plan)
+    localStorage.setItem('dutchclaim_scan_history', JSON.stringify(history))
   }, [data, plan, history])
+
+  const goToEstimate = (scanData: ScanData, currentPlan: Plan) => {
+    const finalData = { ...scanData, email: userEmail ?? scanData.email ?? '' }
+    localStorage.setItem('dutchclaim_scan_data', JSON.stringify(finalData))
+    localStorage.setItem('dutchclaim_plan', currentPlan)
+    localStorage.setItem('dutchclaim_scan_plan', currentPlan)
+    router.push('/scan/analyzing')
+  }
 
   const advance = (updatedData: ScanData, updatedPlan: Plan) => {
     const next = getNextStep(currentStep, updatedData, updatedPlan)
+    // Logged-in users skip the email step and go straight to the estimate
+    if (next === 'email' && userEmail) {
+      goToEstimate(updatedData, updatedPlan)
+      return
+    }
     if (next) setHistory(h => [...h, next])
   }
 
@@ -145,6 +175,7 @@ export default function ScanPage() {
   const pick = (update: Partial<ScanData>, updatedPlan = plan) => {
     const updated = { ...data, ...update }
     setData(updated)
+    if (updatedPlan !== plan) setPlan(updatedPlan)
     setTimeout(() => advance(updated, updatedPlan), 180)
   }
 
@@ -152,14 +183,14 @@ export default function ScanPage() {
 
   const submit = () => {
     if (!data.email) return
-    localStorage.setItem('claimly_plan', plan)
-    localStorage.setItem('claimly_scan_data', JSON.stringify(data))
+    localStorage.setItem('dutchclaim_plan', plan)
+    localStorage.setItem('dutchclaim_scan_data', JSON.stringify(data))
     router.push('/scan/analyzing')
   }
 
   // Progress
-  const STUDENT_TOTAL = 6 // plan, enrolled, living, health, income, email
-  const EXPAT_TOTAL   = 8 // plan, residence, employment, income, household, [children], housing, email
+  const STUDENT_TOTAL = 6  // plan, enrolled, living, health, income, email
+  const EXPAT_TOTAL   = 9  // plan, residence, employment, income, health_insurance, household, [children], housing, email (+ 2 if unemployed)
   const totalEstimate = plan === 'student' ? STUDENT_TOTAL : EXPAT_TOTAL
   const pct = Math.min(((history.length - 1) / (totalEstimate - 1)) * 100, 95)
 
@@ -226,14 +257,14 @@ export default function ScanPage() {
                     <div className="flex items-start gap-3">
                       <span className="text-xl sm:text-2xl shrink-0">🌍</span>
                       <div>
-                        <p className="text-sm font-semibold text-navy">Expat Report</p>
+                        <p className="text-sm font-semibold text-navy">Benefits Report</p>
                         <p className="text-xs text-navy/45 mt-0.5">All 6 Dutch programs, AI-verified</p>
                       </div>
                     </div>
                     <span className="shrink-0 text-xs font-medium text-white bg-brand px-2.5 py-1 rounded-full">€19.99</span>
                   </div>
                   <div className="flex flex-wrap gap-x-3 gap-y-1 mt-3 pl-8 sm:pl-9">
-                    {['Zorgtoeslag', 'Huurtoeslag', 'Kinderopvangtoeslag', 'WW', 'Bijstand'].map(f => (
+                    {['Zorgtoeslag', 'Huurtoeslag', 'Kinderopvangtoeslag', 'Kinderbijslag', 'WW', 'Bijstand'].map(f => (
                       <span key={f} className="flex items-center gap-1 text-xs text-navy/45">
                         <CheckCircle2 size={10} className="text-brand" />{f}
                       </span>
@@ -303,6 +334,7 @@ export default function ScanPage() {
                 options={[
                   { value: 'dutch_national',        label: 'Dutch national',          sub: 'Born in NL or naturalised',         emoji: '🏠' },
                   { value: 'eu_eea_citizen',         label: 'EU / EEA citizen',        sub: 'Free movement rights',              emoji: '🇪🇺' },
+                  { value: 'permanent_resident',     label: 'Permanent Resident',      sub: 'Settled status / indefinite leave', emoji: '🏡' },
                   { value: 'highly_skilled_migrant', label: 'Highly Skilled Migrant',  sub: 'Kennismigrant permit',              emoji: '💼' },
                   { value: 'work_permit',            label: 'Other work permit',       sub: 'Non-EU, non-HSM',                   emoji: '📄' },
                   { value: 'family_reunification',   label: 'Partner / family visa',   sub: 'Joined a partner or family member', emoji: '👫' },
@@ -336,29 +368,96 @@ export default function ScanPage() {
             </div>
           )}
 
+          {/* ── Job loss reason ──────────────────────── */}
+          {currentStep === 'job_loss_reason' && (
+            <div className="fade-up">
+              <StepHeader
+                emoji="💼"
+                title="How did you stop working?"
+                subtitle="WW-uitkering (unemployment benefit) requires the job loss to be involuntary."
+              />
+              <OptionCards
+                cols={1}
+                options={[
+                  { value: 'laid_off', label: 'Laid off, made redundant, or contract ended', emoji: '📋' },
+                  { value: 'quit',     label: 'I resigned / quit voluntarily',               emoji: '🚪' },
+                ]}
+                selected={data.jobLossReason}
+                onSelect={(v) => pick({ jobLossReason: v as 'laid_off' | 'quit' })}
+              />
+            </div>
+          )}
+
+          {/* ── Work history ─────────────────────────── */}
+          {currentStep === 'work_history' && (
+            <div className="fade-up">
+              <StepHeader
+                emoji="📅"
+                title="Did you work in the Netherlands for at least 26 weeks in the past year?"
+                subtitle="This is the main requirement for WW-uitkering. Roughly 6 months of employment."
+              />
+              <YesNo
+                value={data.workedSixMonths}
+                onSelect={(v) => pick({ workedSixMonths: v })}
+                labels={['Yes, 6+ months', 'No, less than that']}
+              />
+            </div>
+          )}
+
+          {/* ── Health insurance ─────────────────────── */}
+          {currentStep === 'health_insurance' && (
+            <div className="fade-up">
+              <StepHeader
+                emoji="🏥"
+                title="Do you have Dutch basic health insurance?"
+                subtitle="Basisverzekering — required to claim Zorgtoeslag. Most NL residents are legally required to have it."
+              />
+              <YesNo
+                value={data.dutchHealthInsurance}
+                onSelect={(v) => pick({ dutchHealthInsurance: v })}
+                labels={['Yes, I have it', 'No / not yet']}
+              />
+            </div>
+          )}
+
           {/* ── Income ───────────────────────────────── */}
           {currentStep === 'income' && (
             <div className="fade-up">
               <StepHeader
                 emoji="💶"
-                title="Monthly net income?"
-                subtitle="After tax — determines your benefit amounts."
+                title={plan === 'student' ? 'Any side income (bijbaan)?' : 'Monthly net income?'}
+                subtitle={plan === 'student' ? 'Grants and DUO don\'t count — only money from a job.' : 'After tax — determines your benefit amounts.'}
               />
-              <OptionCards
-                options={[
-                  { value: 'under_1000', label: 'Under €1,000' },
-                  { value: '1000_1500',  label: '€1,000 – €1,500' },
-                  { value: '1500_2000',  label: '€1,500 – €2,000' },
-                  { value: '2000_2500',  label: '€2,000 – €2,500' },
-                  { value: '2500_3000',  label: '€2,500 – €3,000' },
-                  { value: '3000_3500',  label: '€3,000 – €3,500' },
-                  { value: '3500_4500',  label: '€3,500 – €4,500' },
-                  { value: 'over_4500',  label: 'Over €4,500' },
-                  { value: 'prefer_not', label: 'Prefer not to say' },
-                ]}
-                selected={data.income}
-                onSelect={(v) => pick({ income: v as IncomeRange })}
-              />
+              {plan === 'student' ? (
+                <OptionCards
+                  cols={1}
+                  options={[
+                    { value: 'no_income',  label: 'No job income', sub: 'Grants / DUO / parents only' },
+                    { value: 'under_500',  label: 'Under €500/mo', sub: 'Small bijbaan' },
+                    { value: 'under_1000', label: '€500 – €1,000/mo', sub: 'Part-time job' },
+                    { value: '1000_1500',  label: '€1,000 – €1,500/mo', sub: 'Larger part-time / full-time' },
+                    { value: 'prefer_not', label: 'Prefer not to say' },
+                  ]}
+                  selected={data.income}
+                  onSelect={(v) => pick({ income: v as IncomeRange })}
+                />
+              ) : (
+                <OptionCards
+                  options={[
+                    { value: 'under_1000', label: 'Under €1,000' },
+                    { value: '1000_1500',  label: '€1,000 – €1,500' },
+                    { value: '1500_2000',  label: '€1,500 – €2,000' },
+                    { value: '2000_2500',  label: '€2,000 – €2,500' },
+                    { value: '2500_3000',  label: '€2,500 – €3,000' },
+                    { value: '3000_3500',  label: '€3,000 – €3,500' },
+                    { value: '3500_4500',  label: '€3,500 – €4,500' },
+                    { value: 'over_4500',  label: 'Over €4,500' },
+                    { value: 'prefer_not', label: 'Prefer not to say' },
+                  ]}
+                  selected={data.income}
+                  onSelect={(v) => pick({ income: v as IncomeRange })}
+                />
+              )}
             </div>
           )}
 
@@ -423,35 +522,33 @@ export default function ScanPage() {
                     </button>
                   ))}
                 </div>
+                {data.children?.paidChildcare === true && (
+                  <div>
+                    <p className="text-sm font-medium text-navy mb-2 mt-4">How many days per week?</p>
+                    <div className="grid grid-cols-5 gap-2">
+                      {(['1','2','3','4','5'] as const).map(d => (
+                        <button
+                          key={d}
+                          onClick={() => setData(dd => ({ ...dd, childrenOpvangDaysPerWeek: d as OpvangDaysPerWeek }))}
+                          className={`py-3 rounded-card border-2 text-sm font-bold text-center option-card ${
+                            data.childrenOpvangDaysPerWeek === d ? 'selected border-brand bg-sage text-brand' : 'border-navy/10 bg-white text-navy'
+                          }`}
+                        >
+                          {d}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-xs text-navy/35 mt-1.5">days per week — affects your Kinderopvangtoeslag amount</p>
+                  </div>
+                )}
               </div>
               <button
                 onClick={() => advance(data, plan)}
-                disabled={!data.children?.count || data.children.paidChildcare === undefined}
+                disabled={!data.children?.count || data.children.paidChildcare === undefined || (data.children.paidChildcare === true && !data.childrenOpvangDaysPerWeek)}
                 className="btn-primary w-full bg-brand text-white font-medium py-3.5 rounded-input text-sm disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Continue
               </button>
-            </div>
-          )}
-
-          {/* ── Children: Opvang days ─────────────────── */}
-          {currentStep === 'children_opvang_days' && (
-            <div className="fade-up">
-              <StepHeader
-                emoji="📅"
-                title="How many days per week at childcare?"
-                subtitle="More days = higher Kinderopvangtoeslag. We'll calculate the exact amount."
-              />
-              <OptionCards
-                cols={1}
-                options={[
-                  { value: '1_2', label: '1–2 days per week',  sub: 'Part-time' },
-                  { value: '3_4', label: '3–4 days per week',  sub: 'Regular schedule' },
-                  { value: '5',   label: '5 days per week',    sub: 'Full week' },
-                ]}
-                selected={data.childrenOpvangDaysPerWeek}
-                onSelect={(v) => pick({ childrenOpvangDaysPerWeek: v as OpvangDaysPerWeek })}
-              />
             </div>
           )}
 
@@ -474,23 +571,49 @@ export default function ScanPage() {
                 onSelect={(v) => setData(d => ({ ...d, housing: { type: v as HousingType } }))}
               />
               {data.housing?.type === 'rent' && (
-                <div className="pt-4 border-t border-navy/8">
-                  <p className="text-sm font-medium text-navy mb-3">Monthly rent?</p>
-                  <OptionCards
-                    options={[
-                      { value: 'under_500', label: 'Under €500' },
-                      { value: '500_800',   label: '€500 – €800' },
-                      { value: '800_1000',  label: '€800 – €1,000' },
-                      { value: '1000_1200', label: 'Over €1,000' },
-                    ]}
-                    selected={data.housing?.rent}
-                    onSelect={(v) => setData(d => ({ ...d, housing: { type: 'rent', rent: v as RentRange } }))}
-                  />
-                </div>
+                <>
+                  <div className="pt-4 border-t border-navy/8">
+                    <p className="text-sm font-medium text-navy mb-3">Monthly rent?</p>
+                    <OptionCards
+                      options={[
+                        { value: 'under_500', label: 'Under €500' },
+                        { value: '500_800',   label: '€500 – €800' },
+                        { value: '800_1000',  label: '€800 – €1,000' },
+                        { value: '1000_1200', label: 'Over €1,000' },
+                      ]}
+                      selected={data.housing?.rent}
+                      onSelect={(v) => setData(d => ({ ...d, housing: { type: 'rent', rent: v as RentRange } }))}
+                    />
+                  </div>
+                  {data.housing?.rent && (
+                    <div className="pt-4 border-t border-navy/8">
+                      <p className="text-sm font-medium text-navy mb-1">Is the rental contract in your name?</p>
+                      <p className="text-xs text-navy/45 mb-3">Required for Huurtoeslag — subletting or sharing someone else&apos;s contract doesn&apos;t qualify.</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        {([true, false] as const).map((v, i) => (
+                          <button
+                            key={String(v)}
+                            onClick={() => setData(d => ({ ...d, rentalContractOwnName: v }))}
+                            className={`option-card py-3 rounded-card border-2 text-sm font-medium transition-all ${
+                              data.rentalContractOwnName === v
+                                ? 'selected border-brand bg-sage text-brand'
+                                : 'border-navy/10 bg-white text-navy hover:border-brand/40'
+                            }`}
+                          >
+                            {["Yes, it's mine", 'No / subletting'][i]}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
               <button
                 onClick={() => advance(data, plan)}
-                disabled={!data.housing?.type || (data.housing?.type === 'rent' && !data.housing.rent)}
+                disabled={
+                  !data.housing?.type ||
+                  (data.housing?.type === 'rent' && (!data.housing.rent || data.rentalContractOwnName === undefined))
+                }
                 className="btn-primary w-full bg-brand text-white font-medium py-3.5 rounded-input text-sm disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Continue
@@ -515,16 +638,6 @@ export default function ScanPage() {
                   onKeyDown={(e) => e.key === 'Enter' && submit()}
                   className="w-full border border-navy/15 rounded-input px-4 py-3 text-navy placeholder:text-navy/30 focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand transition-all bg-white"
                 />
-                <label className="flex items-start gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={data.subscribeToUpdates ?? false}
-                    onChange={(e) => setData(d => ({ ...d, subscribeToUpdates: e.target.checked }))}
-                    className="mt-0.5 w-4 h-4 accent-brand"
-                  />
-                  <span className="text-sm text-navy/55">Alert me when my eligibility changes</span>
-                </label>
-                <p className="text-xs text-navy/35">🔒 No spam. Unsubscribe anytime.</p>
                 <button
                   onClick={submit}
                   disabled={!data.email}

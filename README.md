@@ -1,4 +1,4 @@
-# Claimly — Find what you're owed
+# DutchClaim — Find what you're owed
 
 AI-powered government benefits eligibility finder for expats and HR departments in the Netherlands and Belgium.
 
@@ -17,7 +17,7 @@ AI-powered government benefits eligibility finder for expats and HR departments 
 
 ```bash
 git clone <repo-url>
-cd claimly
+cd dutchclaim
 npm install
 ```
 
@@ -87,7 +87,7 @@ Set all environment variables in the Vercel dashboard under your project setting
 ## Project Structure
 
 ```
-claimly/
+dutchclaim/
 ├── app/
 │   ├── layout.tsx          # Root layout, fonts, metadata
 │   ├── page.tsx            # Landing page

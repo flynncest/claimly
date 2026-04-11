@@ -80,7 +80,7 @@ export default function AnalyzingPage() {
     if (called.current) return
     called.current = true
 
-    const raw = localStorage.getItem('claimly_scan_data')
+    const raw = localStorage.getItem('dutchclaim_scan_data')
     if (!raw) {
       router.push('/scan')
       return
@@ -88,7 +88,7 @@ export default function AnalyzingPage() {
 
     const scanData: ScanData = JSON.parse(raw)
     const estimate = estimateBenefits(scanData)
-    localStorage.setItem('claimly_estimate', JSON.stringify(estimate))
+    localStorage.setItem('dutchclaim_estimate', JSON.stringify(estimate))
     setReady(true)
   }, [router])
 
@@ -106,9 +106,9 @@ export default function AnalyzingPage() {
         {/* Logo */}
         <div className="flex items-center justify-center gap-2 mb-12">
           <div className="w-8 h-8 bg-brand rounded-lg flex items-center justify-center">
-            <span className="text-white font-serif font-bold">C</span>
+            <span className="text-white font-serif font-bold text-sm leading-none">€</span>
           </div>
-          <span className="font-serif text-xl text-navy">Claimly</span>
+          <span className="font-serif text-xl text-navy">DutchClaim</span>
         </div>
 
         {/* Circular progress */}

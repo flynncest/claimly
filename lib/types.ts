@@ -3,6 +3,7 @@ export type Country = 'NL' | 'BE'
 export type ResidenceStatus =
   | 'dutch_national'
   | 'eu_eea_citizen'
+  | 'permanent_resident'
   | 'highly_skilled_migrant'
   | 'international_student'
   | 'work_permit'
@@ -23,6 +24,8 @@ export type EmploymentStatus =
   | 'other'
 
 export type IncomeRange =
+  | 'no_income'    // student: no job income (grants / parents only)
+  | 'under_500'    // student: small bijbaan, under €500/mo
   | 'under_1000'
   | '1000_1500'
   | '1500_2000'
@@ -51,7 +54,7 @@ export type RentRange =
 
 export type ChildAgeGroup = '0_4' | '4_12' | '12_18'
 
-export type OpvangDaysPerWeek = '1_2' | '3_4' | '5'
+export type OpvangDaysPerWeek = '1' | '2' | '3' | '4' | '5'
 
 export type OpvangType = 'dagopvang' | 'bso' | 'both'
 
@@ -83,6 +86,16 @@ export interface ScanData {
   email?: string
   subscribeToUpdates?: boolean
 
+  // Health insurance (applies to all plans)
+  dutchHealthInsurance?: boolean
+
+  // Unemployment details
+  jobLossReason?: 'laid_off' | 'quit'
+  workedSixMonths?: boolean           // worked 26+ weeks in last 36 (WW requirement)
+
+  // Rental details
+  rentalContractOwnName?: boolean
+
   // Detailed quiz fields (post-payment)
   partnerLivingWithYou?: boolean
   partnerEmployed?: boolean
@@ -96,7 +109,6 @@ export interface ScanData {
 
   // Student quiz fields
   enrolledAtDutchInstitution?: boolean
-  dutchHealthInsurance?: boolean
   studentLivesAway?: boolean
   duoStudiefinanciering?: boolean
   bsnRegistered?: boolean
@@ -154,4 +166,5 @@ export interface SavedReport {
   country: string
   scan_data: ScanData
   result: AnalysisResult
+  name: string | null
 }

@@ -8,7 +8,7 @@ export default function DashboardEmptyState() {
   const [generating, setGenerating] = useState(false)
 
   useEffect(() => {
-    const raw = localStorage.getItem('claimly_scan_data')
+    const raw = localStorage.getItem('dutchclaim_scan_data')
     setGenerating(!!raw)
   }, [])
 

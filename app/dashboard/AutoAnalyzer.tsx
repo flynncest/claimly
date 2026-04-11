@@ -1,6 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+// Fallback: if the user somehow ends up on the dashboard with unprocessed
+// scan data and a paid flag (e.g. pay page crashed before redirect), pick
+// it up here so they don't lose their report.
+
+import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { Loader2 } from 'lucide-react'
@@ -8,19 +12,25 @@ import { Loader2 } from 'lucide-react'
 export default function AutoAnalyzer({ hasReports }: { hasReports: boolean }) {
   const router = useRouter()
   const [status, setStatus] = useState('')
+  const called = useRef(false)
 
   useEffect(() => {
-    const paid = localStorage.getItem('claimly_paid')
-    const raw = localStorage.getItem('claimly_scan_data')
-    // Run if explicitly paid, or if user has scan data but no reports yet (beta: free)
-    if (!raw) return
-    if (!paid && hasReports) return
+    if (called.current) return
+
+    const paid = localStorage.getItem('dutchclaim_paid')
+    const raw = localStorage.getItem('dutchclaim_scan_data')
+
+    // Only run as a fallback: must have both paid flag AND scan data.
+    // If analysis already ran on the pay page, these will have been cleared.
+    if (!paid || !raw) return
+
+    called.current = true
 
     const run = async () => {
       const scanData = JSON.parse(raw)
-      const plan = localStorage.getItem('claimly_plan') ?? 'full'
+      const plan = localStorage.getItem('dutchclaim_plan') ?? 'full'
 
-      setStatus('Running AI analysis...')
+      setStatus('Analysing your profile...')
       const res = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -28,7 +38,7 @@ export default function AutoAnalyzer({ hasReports }: { hasReports: boolean }) {
       })
 
       if (!res.ok) {
-        setStatus('Analysis failed — please try again.')
+        setStatus('Analysis failed — please go back to /pay and try again.')
         return
       }
 
@@ -51,8 +61,8 @@ export default function AutoAnalyzer({ hasReports }: { hasReports: boolean }) {
       }
 
       const saved = await saveRes.json()
-      if (saved?.id) {
-        localStorage.setItem('claimly_report_id', saved.id)
+
+      if (saved?.id && email) {
         fetch('/api/send-email', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -60,11 +70,14 @@ export default function AutoAnalyzer({ hasReports }: { hasReports: boolean }) {
         }).catch(() => null)
       }
 
-      localStorage.removeItem('claimly_paid')
-      localStorage.removeItem('claimly_plan')
-      localStorage.removeItem('claimly_scan_data')
+      localStorage.removeItem('dutchclaim_paid')
+      localStorage.removeItem('dutchclaim_plan')
+      localStorage.removeItem('dutchclaim_scan_data')
+      localStorage.removeItem('dutchclaim_estimate')
+      localStorage.removeItem('dutchclaim_scan_history')
+
       setStatus('')
-      window.location.href = '/dashboard'
+      window.location.href = saved?.id ? `/dashboard?reportId=${saved.id}` : '/dashboard'
     }
 
     run()

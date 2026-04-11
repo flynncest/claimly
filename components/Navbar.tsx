@@ -52,9 +52,9 @@ export default function Navbar() {
             {/* Logo */}
             <Link href="/" className="flex items-center gap-2 group">
               <div className="w-7 h-7 bg-brand rounded-lg flex items-center justify-center">
-                <span className="text-white font-serif font-bold text-sm">C</span>
+                <span className="text-white font-serif font-bold text-sm leading-none">€</span>
               </div>
-              <span className="font-serif text-xl text-navy">Claimly</span>
+              <span className="font-serif text-xl text-navy">DutchClaim</span>
             </Link>
 
             {/* Desktop nav links */}
@@ -68,8 +68,8 @@ export default function Navbar() {
               <Link href="/students" className="text-sm text-navy/50 hover:text-navy transition-colors">
                 For Students
               </Link>
-              <Link href="/expat" className="text-sm text-navy/50 hover:text-navy transition-colors">
-                For Expats
+              <Link href="/workers" className="text-sm text-navy/50 hover:text-navy transition-colors">
+                For Workers
               </Link>
             </div>
 
@@ -141,7 +141,7 @@ export default function Navbar() {
                 { href: '/#how-it-works', label: 'How it works' },
                 { href: '/pricing', label: 'Pricing' },
                 { href: '/students', label: 'For Students' },
-                { href: '/expat', label: 'For Expats' },
+                { href: '/workers', label: 'For Workers' },
               ].map((item) => (
                 <Link
                   key={item.href}

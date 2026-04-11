@@ -18,14 +18,14 @@ const dmSans = DM_Sans({
 })
 
 export const metadata: Metadata = {
-  title: "Claimly — Find what you're owed in the Netherlands",
+  title: "DutchClaim — Find what you're owed in the Netherlands",
   description:
-    'Claimly checks every Dutch government benefit program against your profile and tells you exactly what you qualify for — in English, in under 2 minutes.',
-  keywords: 'benefits Netherlands toeslagen zorgtoeslag huurtoeslag international worker expat student',
+    'DutchClaim checks every Dutch government benefit program against your profile and tells you exactly what you qualify for — in English, in under 2 minutes.',
+  keywords: 'benefits Netherlands toeslagen zorgtoeslag huurtoeslag international worker student dutchclaim',
   openGraph: {
-    title: "Claimly — Find what you're owed in the Netherlands",
+    title: "DutchClaim — Find what you're owed in the Netherlands",
     description:
-      'Expats and students in the Netherlands miss €3,200+ per year in benefits they\'re entitled to. Claimly finds yours in 2 minutes, in English.',
+      'Expats and students in the Netherlands miss €3,200+ per year in benefits they\'re entitled to. DutchClaim finds yours in 2 minutes, in English.',
     type: 'website',
   },
 }

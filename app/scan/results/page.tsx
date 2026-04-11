@@ -4,19 +4,29 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { TrendingUp, Lock, CheckCircle2, ArrowRight } from 'lucide-react'
+import { createClient } from '@/lib/supabase'
 import type { BenefitsPreEstimate } from '@/lib/benefitsDb'
 
 export default function ResultsPage() {
   const router = useRouter()
   const [estimate, setEstimate] = useState<BenefitsPreEstimate | null>(null)
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
 
   useEffect(() => {
-    const raw = localStorage.getItem('claimly_estimate')
+    const raw = localStorage.getItem('dutchclaim_estimate')
     if (!raw) {
       router.push('/scan')
       return
     }
     setEstimate(JSON.parse(raw))
+
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    if (supabaseUrl && supabaseKey) {
+      createClient().auth.getSession().then(({ data: { session } }) => {
+        if (session?.user) setIsLoggedIn(true)
+      })
+    }
   }, [router])
 
   if (!estimate) {
@@ -50,7 +60,7 @@ export default function ResultsPage() {
 
         {/* Total estimate banner */}
         {estimate.total_max > 0 ? (
-          <div className="fade-up bg-[#C8BFB0] rounded-card p-6 mb-8 border border-navy/8" style={{ animationDelay: '0.1s' }}>
+          <div className="fade-up bg-white rounded-card p-6 mb-8 border border-navy/10 shadow-card" style={{ animationDelay: '0.1s' }}>
             <div className="flex items-center gap-3 mb-2">
               <TrendingUp size={20} className="text-brand/70" />
               <p className="text-navy/55 text-sm">Estimated monthly total</p>
@@ -92,8 +102,16 @@ export default function ResultsPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <Lock size={12} className="text-navy/30" />
-                    <span className="text-xs text-navy/30 font-medium">Amount locked</span>
+                    {p.program_id === 'ov_studentenkaart' ? (
+                      <span className="text-xs font-medium text-brand bg-brand/8 px-2 py-0.5 rounded-full">
+                        🚆 Free nationwide travel
+                      </span>
+                    ) : (
+                      <>
+                        <Lock size={12} className="text-navy/30" />
+                        <span className="text-xs text-navy/30 font-medium">Amount locked</span>
+                      </>
+                    )}
                   </div>
                 </div>
               ))}
@@ -149,18 +167,29 @@ export default function ResultsPage() {
             </div>
 
             <div className="flex flex-wrap gap-3 mt-6">
-              <Link
-                href="/login?redirect=/pay&mode=signup"
-                className="btn-primary inline-flex items-center gap-2 bg-brand text-white text-sm font-medium px-6 py-3 rounded-input"
-              >
-                Create account & unlock <ArrowRight size={15} />
-              </Link>
-              <Link
-                href="/login?redirect=/pay"
-                className="inline-flex items-center gap-2 border border-navy/20 text-navy text-sm font-medium px-5 py-3 rounded-input hover:bg-navy/5 transition-colors"
-              >
-                Already have an account?
-              </Link>
+              {isLoggedIn ? (
+                <Link
+                  href="/pay"
+                  className="btn-primary inline-flex items-center gap-2 bg-brand text-white text-sm font-medium px-6 py-3 rounded-input"
+                >
+                  Unlock full report <ArrowRight size={15} />
+                </Link>
+              ) : (
+                <>
+                  <Link
+                    href="/login?redirect=/pay&mode=signup"
+                    className="btn-primary inline-flex items-center gap-2 bg-brand text-white text-sm font-medium px-6 py-3 rounded-input"
+                  >
+                    Create account & unlock <ArrowRight size={15} />
+                  </Link>
+                  <Link
+                    href="/login?redirect=/pay"
+                    className="inline-flex items-center gap-2 border border-navy/20 text-navy text-sm font-medium px-5 py-3 rounded-input hover:bg-navy/5 transition-colors"
+                  >
+                    Already have an account?
+                  </Link>
+                </>
+              )}
             </div>
 
             <p className="text-xs text-navy/35 mt-4">

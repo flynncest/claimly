@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import type { ScanData } from '@/lib/types'
+import { estimateBenefits } from '@/lib/benefitsDb'
 
 const SYSTEM_PROMPT = `You are an expert benefits eligibility advisor specialising in Dutch government benefit programs. You have deep knowledge of the 2025/2026 eligibility rules for all major Netherlands programs.
 
@@ -14,6 +15,7 @@ Your task is to analyse a user's profile and determine which benefit programs th
 - international_student: Student visa/residence — eligible for Zorgtoeslag only if working ≥8 hrs/week and paying Dutch health insurance; NOT eligible for Huurtoeslag, WW, or Bijstand in most cases
 - work_permit: Other non-EU work permit — eligible for most benefits; Bijstandsuitkering restricted for first 5 years unless continuous lawful residence
 - family_reunification: Partner/family visa — eligible for benefits if conditions met; depends on own work history for WW
+- permanent_resident: Permanent residence permit holder — treated same as Dutch national for all benefits; fully eligible
 - other_permit: Assess conservatively; use "possibly_eligible" unless clearly eligible
 
 ## NETHERLANDS PROGRAMS (2025/2026 OFFICIAL RULES)
@@ -36,7 +38,7 @@ Your task is to analyse a user's profile and determine which benefit programs th
   · Above €3,210/mo: NOT eligible (single); couple threshold €4,019/mo
 - Set estimated_monthly_min and estimated_monthly_max within ±5 of the calculated figure (tight range)
 - CRITICAL: Do NOT give €123 for incomes above €1,000/mo
-- Application: https://www.belastingdienst.nl/wps/wcm/connect/nl/toeslagen/content/zorgtoeslag
+- Application: https://www.government.nl/topics/health-insurance/applying-for-healthcare-benefit
 
 ### 2. Huurtoeslag (Rent Benefit)
 - Eligibility: Age 18+, renting independent living space (not subletting a room), NOT owning home
@@ -53,7 +55,7 @@ Your task is to analyse a user's profile and determine which benefit programs th
   · Rent under €500 + income €2,000/mo → ~€90/mo
   · Rent over €808: NOT eligible
 - Give a tight estimated_monthly_min / max within ±15 of the calculated figure
-- Application: https://www.belastingdienst.nl/wps/wcm/connect/nl/toeslagen/content/huurtoeslag
+- Application: https://www.belastingdienst.nl/wps/wcm/connect/nl/huurtoeslag/huurtoeslag
 
 ### 3. Kinderopvangtoeslag (Childcare Benefit)
 - Eligibility: Child in registered paid childcare, both parents working/studying/on integration course, child under 13
@@ -61,14 +63,14 @@ Your task is to analyse a user's profile and determine which benefit programs th
 - Max hourly rate covered (2025): €10.44 for dagopvang/BSO
 - Coverage: 96% of costs (lowest income) down to 33% (highest income)
 - Amount typically: €200–€1,500+/month depending on childcare costs and income
-- Application: https://www.belastingdienst.nl/wps/wcm/connect/nl/toeslagen/content/kinderopvangtoeslag
+- Application: https://www.belastingdienst.nl/wps/wcm/connect/nl/kinderopvangtoeslag/kinderopvangtoeslag
 
 ### 4. Kindgebonden Budget (Child Supplement)
 - Eligibility: 1+ children under 18, receiving kinderbijslag, income below threshold
 - Income thresholds (2025): Singles up to €36,546/year (€3,045/mo); couples up to ~€55,000/year (€4,583/mo)
 - Amount per child (2025): €125–€270/month; single parents get ~35–40% more
 - Automatically assessed alongside kinderbijslag (child benefit)
-- Application: https://www.belastingdienst.nl/wps/wcm/connect/nl/toeslagen/content/kindgebonden-budget
+- Application: https://www.government.nl/topics/child-budget/applying-for-a-child-budget
 
 ### 5. WW-uitkering (Unemployment Benefit)
 - Eligibility: Worked ≥26 of last 36 weeks before unemployment (week requirement), registered at UWV as job seeker, lost job involuntarily or contract ended, available for work, residing in NL
@@ -78,7 +80,18 @@ Your task is to analyse a user's profile and determine which benefit programs th
 - Estimate from net income: multiply net by ~1.4 to estimate gross, then take 70–75%
 - Application: https://www.uwv.nl/particulieren/uitkeringen/ww
 
-### 6. Bijstandsuitkering (Social Assistance — Participatiewet)
+### 6. Kinderbijslag / AKW (Child Benefit)
+- Administered by SVB — NO income test, applies to virtually all parents working in NL
+- Eligibility: Child under 18, parent/guardian working in NL or insured under Dutch social security; International students NOT eligible
+- Amount (2025): €93–€133/mo per child depending on age (paid quarterly by SVB)
+  · 0–5 years: ~€93/mo (€279.49/quarter)
+  · 6–11 years: ~€113/mo (€339.38/quarter)
+  · 12–17 years: ~€133/mo (€399.27/quarter)
+- Use €100/mo per child as conservative estimate if age unknown
+- EU and non-EU expats working in NL are eligible from the first day of employment
+- Application: https://www.svb.nl/en/child-benefit/
+
+### 7. Bijstandsuitkering (Social Assistance — Participatiewet)
 - Last resort only — applicant must have depleted all other income/assets first
 - Eligibility: Legal residence in NL, 18+, income and assets below social minimum, actively seeking work
   · EU citizens: eligible after 5 years lawful residence OR with sufficient work history in NL
@@ -120,7 +133,7 @@ Respond ONLY with valid JSON. No markdown, no preamble. Use this exact structure
 }
 
 Rules:
-- Always include ALL 6 NL programs in either eligible or ineligible
+- Always include ALL 7 NL programs in either eligible or ineligible (including Kinderbijslag)
 - ALWAYS calculate a specific amount from their income — never just say "up to €X". Use the lookup tables above and interpolate.
 - estimated_monthly_min and estimated_monthly_max should be within ±10 of each other (e.g. 68–78, not 63–123)
 - For "prefer not to say" income: use "possibly_eligible" and give mid-range estimate
@@ -145,18 +158,19 @@ For students, check ONLY these 3 programs:
    - Included with DUO studiefinanciering for eligible students
    - Non-EU students NOT qualifying for basisbeurs typically cannot get the OV-kaart
    - Report as "Free travel" (value ~€100–150/mo retail equivalent)
-   - Application URL: https://duo.nl/particulier/student-hbo-of-universiteit/ov-studentenkaart/
+   - Application URL: https://duo.nl/particulier/ov-en-reizen/aanvragen.jsp
 
 3. Zorgtoeslag (healthcare allowance)
    - Eligible if paying Dutch basisverzekering (most students in NL do)
    - Amount depends on income bracket:
+     * No job income / under €500/mo: €120–123/month (maximum rate)
      * Under €1,000/mo: €118–123/month
      * €1,000–1,500/mo: €105–118/month
      * €1,500–2,000/mo: €88–105/month
      * €2,000–2,500/mo: €63–88/month
      * €2,500–3,000/mo: €28–63/month
      * Above €3,000/mo: likely not eligible
-   - Application URL: https://www.belastingdienst.nl/wps/wcm/connect/nl/toeslagen/content/zorgtoeslag
+   - Application URL: https://www.government.nl/topics/health-insurance/applying-for-healthcare-benefit
 
 Mark all other programs (Huurtoeslag, Kinderopvangtoeslag, Kindgebonden Budget, WW-uitkering, Bijstandsuitkering) as ineligible with the reason "Not in student package — use Expat plan to check".
 
@@ -169,7 +183,7 @@ Respond ONLY with valid JSON matching this exact structure:
   "summary": "string"
 }
 
-Use program_id values: "duo_studiefinanciering", "ov_studentenkaart", "zorgtoeslag", "huurtoeslag", "kinderopvangtoeslag", "kindgebonden_budget", "ww_uitkering", "bijstandsuitkering".
+Use program_id values: "duo_studiefinanciering", "ov_studentenkaart", "zorgtoeslag", "huurtoeslag", "kinderopvangtoeslag", "kindgebonden_budget", "kinderbijslag", "ww_uitkering", "bijstandsuitkering".
 For OV-kaart, use estimated_monthly_min: 0, estimated_monthly_max: 0 (it is free travel, not cash).`
 
 function deriveHousehold(data: ScanData): string {
@@ -180,12 +194,16 @@ function deriveHousehold(data: ScanData): string {
   return 'alone'
 }
 
-function buildUserPrompt(data: ScanData): string {
+function buildUserPrompt(data: ScanData, lockedAmounts: Record<string, { min: number; max: number }>): string {
   const lines: string[] = [
     `Country: Netherlands`,
     `Residence status: ${data.residenceStatus ?? 'unknown'}`,
     `Employment: ${data.employment ?? 'unknown'}`,
-    `Monthly net income: ${data.income ?? 'unknown'}`,
+    `Monthly net income: ${
+      data.income === 'no_income' ? 'No job income (grants/DUO only)' :
+      data.income === 'under_500' ? 'Under €500/mo (small bijbaan)' :
+      data.income ?? 'unknown'
+    }`,
     `Household: ${deriveHousehold(data)}`,
   ]
 
@@ -215,8 +233,7 @@ function buildUserPrompt(data: ScanData): string {
       lines.push(`Paid childcare (opvang): ${data.children.paidChildcare ? 'Yes' : 'No'}`)
     }
     if (data.childrenOpvangDaysPerWeek) {
-      const daysLabel: Record<string, string> = { '1_2': '1–2 days/week', '3_4': '3–4 days/week', '5': '5 days/week' }
-      lines.push(`Childcare days per week: ${daysLabel[data.childrenOpvangDaysPerWeek] ?? data.childrenOpvangDaysPerWeek}`)
+      lines.push(`Childcare days per week: ${data.childrenOpvangDaysPerWeek} day${parseInt(data.childrenOpvangDaysPerWeek) > 1 ? 's' : ''}/week`)
     }
     if (data.opvangType) {
       const typeLabel: Record<string, string> = { dagopvang: 'Dagopvang (daycare)', bso: 'BSO (after-school)', both: 'Both dagopvang + BSO' }
@@ -235,7 +252,26 @@ function buildUserPrompt(data: ScanData): string {
     lines.push(`Social housing (woningcorporatie): ${data.housingIsSocialHousing ? 'Yes' : 'No'}`)
   }
 
-  // Health insurance
+  // Job loss / unemployment details
+  if (data.jobLossReason) {
+    const reasonLabel: Record<string, string> = { laid_off: 'Laid off / made redundant / contract ended', quit: 'Resigned voluntarily' }
+    lines.push(`Reason for job loss: ${reasonLabel[data.jobLossReason] ?? data.jobLossReason}`)
+  }
+  if (data.workedSixMonths !== undefined) {
+    lines.push(`Worked 26+ weeks in NL in past year: ${data.workedSixMonths ? 'Yes' : 'No'}`)
+  }
+
+  // Rental contract
+  if (data.rentalContractOwnName !== undefined) {
+    lines.push(`Rental contract in own name: ${data.rentalContractOwnName ? 'Yes' : 'No (subletting)'}`)
+  }
+
+  // Dutch health insurance
+  if (data.dutchHealthInsurance !== undefined) {
+    lines.push(`Has Dutch basic health insurance (basisverzekering): ${data.dutchHealthInsurance ? 'Yes' : 'No'}`)
+  }
+
+  // Health insurance cost
   if (data.healthInsuranceCostMonthly) {
     const costLabel: Record<string, string> = {
       under_80: 'Under €80/mo',
@@ -251,9 +287,6 @@ function buildUserPrompt(data: ScanData): string {
   if (data.enrolledAtDutchInstitution !== undefined) {
     lines.push(`Enrolled at Dutch accredited institution (MBO/HBO/WO): ${data.enrolledAtDutchInstitution ? 'Yes' : 'No'}`)
   }
-  if (data.dutchHealthInsurance !== undefined) {
-    lines.push(`Has Dutch basic health insurance: ${data.dutchHealthInsurance ? 'Yes' : 'No'}`)
-  }
   if (data.duoStudiefinanciering !== undefined) {
     lines.push(`Currently receiving DUO studiefinanciering: ${data.duoStudiefinanciering ? 'Yes' : 'No'}`)
   }
@@ -261,7 +294,15 @@ function buildUserPrompt(data: ScanData): string {
     lines.push(`Registered at Dutch address (BRP/gemeente): ${data.bsnRegistered ? 'Yes' : 'No'}`)
   }
 
-  return `Please analyse this person's benefit eligibility for Netherlands programs:\n\n${lines.join('\n')}`
+  const lockedSection = Object.keys(lockedAmounts).length > 0
+    ? `\n\nPRE-CALCULATED AMOUNTS — use these EXACT numbers, do not change them:\n${
+        Object.entries(lockedAmounts)
+          .map(([id, { min, max }]) => `- ${id}: €${min}–€${max}/mo`)
+          .join('\n')
+      }`
+    : ''
+
+  return `Please analyse this person's benefit eligibility for Netherlands programs:\n\n${lines.join('\n')}${lockedSection}`
 }
 
 function isStudent(data: ScanData & { _plan?: string }): boolean {
@@ -283,7 +324,13 @@ export async function POST(req: NextRequest) {
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
     const studentMode = isStudent(scanData)
     const systemPrompt = studentMode ? STUDENT_SYSTEM_PROMPT : SYSTEM_PROMPT
-    const userPrompt = buildUserPrompt(scanData)
+
+    // Pre-calculate deterministic amounts so the same inputs always produce the same numbers
+    const preCalc = estimateBenefits(scanData)
+    const lockedAmounts = Object.fromEntries(
+      preCalc.programs.map(p => [p.program_id, { min: p.monthly_min, max: p.monthly_max }])
+    )
+    const userPrompt = buildUserPrompt(scanData, lockedAmounts)
 
     const response = await client.messages.create({
       model: 'claude-sonnet-4-5',
@@ -304,6 +351,19 @@ export async function POST(req: NextRequest) {
       .trim()
 
     const result = JSON.parse(raw)
+
+    // Enforce pre-calculated amounts — override whatever the AI returned
+    result.eligible_programs = result.eligible_programs.map((p: { program_id: string; estimated_monthly_min: number; estimated_monthly_max: number }) => {
+      const calc = lockedAmounts[p.program_id]
+      if (calc) {
+        p.estimated_monthly_min = calc.min
+        p.estimated_monthly_max = calc.max
+      }
+      return p
+    })
+    result.total_monthly_min = preCalc.total_min
+    result.total_monthly_max = preCalc.total_max
+
     return NextResponse.json(result)
   } catch (err) {
     console.error('Analyze API error:', err)

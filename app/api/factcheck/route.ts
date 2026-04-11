@@ -10,7 +10,7 @@ const FACTCHECK_SYSTEM_PROMPT = `You are an independent fact-checker reviewing A
 - Age 18+, Dutch basisverzekering required, resident in NL
 - Income thresholds: Singles ≤ €38,520/year; Partners combined ≤ €48,224/year
 - Amount: €89–€123/month
-- Source: Belastingdienst — https://www.belastingdienst.nl/wps/wcm/connect/nl/toeslagen/content/zorgtoeslag-aanvragen
+- Source: Dutch Government — https://www.government.nl/topics/health-insurance/applying-for-healthcare-benefit
 
 ### Huurtoeslag (Rent Benefit)
 - Age 18+, renting (not owning), rent €315–€808.06/month

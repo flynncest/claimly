@@ -3,16 +3,14 @@
 export const dynamic = 'force-dynamic'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { CheckCircle2, Loader2 } from 'lucide-react'
+import { CheckCircle2, ArrowRight } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
+import Link from 'next/link'
 
-const PLANS = [
-  {
-    id: 'student',
+const PLAN_DETAILS = {
+  student: {
     name: 'Student Report',
     price: '€13.99',
-    period: 'one-time',
     features: [
       'DUO Studiefinanciering eligibility check',
       'OV-studentenkaart (train pass) check',
@@ -20,74 +18,108 @@ const PLANS = [
       'Step-by-step application guide',
     ],
   },
-  {
-    id: 'full',
-    name: 'Expat Report',
+  full: {
+    name: 'Benefits Report',
     price: '€19.99',
-    period: 'one-time',
-    highlight: true,
     features: [
-      'All 6 Dutch programs AI-verified',
-      'Income-based benefit calculations',
+      'All 6 Dutch benefit programs checked',
+      'Income-based calculations for your situation',
       'Step-by-step application guides',
       'Conditions met & reasons explained',
       'Priority email support',
     ],
   },
-]
+}
 
 export default function PayPage() {
-  const router = useRouter()
-
-  const [selectedPlan, setSelectedPlan] = useState<'student' | 'full'>('full')
+  const [plan, setPlan] = useState<'student' | 'full'>('full')
+  const [hasScanData, setHasScanData] = useState<boolean | null>(null)
   const [loading, setLoading] = useState(false)
-  const [status, setStatus] = useState('')
   const [error, setError] = useState('')
-  const [checkingAuth, setCheckingAuth] = useState(true)
 
-  // Require login
   useEffect(() => {
-    const supabase = createClient()
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) {
-        router.replace('/login?redirect=/pay')
-      } else {
-        setCheckingAuth(false)
-      }
-    })
-  }, [router])
-
-  // Auto-select student plan if scan data shows student
-  useEffect(() => {
-    const raw = localStorage.getItem('claimly_scan_data')
-    if (raw) {
-      const scanData = JSON.parse(raw)
-      if (
-        scanData.residenceStatus === 'international_student' ||
-        scanData.employment === 'student'
-      ) {
-        setSelectedPlan('student')
+    const savedPlan = localStorage.getItem('dutchclaim_scan_plan') as 'student' | 'full' | null
+    if (savedPlan === 'student' || savedPlan === 'full') {
+      setPlan(savedPlan)
+    } else {
+      const raw = localStorage.getItem('dutchclaim_scan_data')
+      if (raw) {
+        const sd = JSON.parse(raw)
+        if (sd.residenceStatus === 'international_student' || sd.employment === 'student') {
+          setPlan('student')
+        }
       }
     }
+    setHasScanData(!!localStorage.getItem('dutchclaim_scan_data'))
   }, [])
 
   const handleUnlock = async () => {
+    setError('')
+    const raw = localStorage.getItem('dutchclaim_scan_data')
+    if (!raw) { setHasScanData(false); return }
+
     setLoading(true)
-    setStatus('Confirming...')
+    try {
+      // Get user email if logged in
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      const scanData = JSON.parse(raw)
+      const email = user?.email ?? scanData.email ?? ''
 
-    const raw = localStorage.getItem('claimly_scan_data')
-    if (!raw) {
-      router.push('/scan')
-      return
+      // Encode scan data for Stripe metadata (max 500 chars per value — we base64 it)
+      const scanDataB64 = Buffer.from(JSON.stringify(scanData)).toString('base64')
+
+      const res = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan, email, scanDataKey: scanDataB64 }),
+      })
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error ?? 'Could not create checkout session.')
+      }
+
+      const { url } = await res.json()
+      if (!url) throw new Error('No checkout URL returned.')
+
+      window.location.href = url
+    } catch (err) {
+      setLoading(false)
+      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
     }
-
-    // Store selected plan so AI knows which mode to run
-    localStorage.setItem('claimly_plan', selectedPlan)
-    localStorage.setItem('claimly_paid', 'true')
-    router.push('/dashboard')
   }
 
-  if (checkingAuth) {
+  // No scan data found
+  if (hasScanData === false) {
+    return (
+      <div className="min-h-screen bg-[#E8DFD0] flex items-center justify-center px-4">
+        <div className="max-w-sm mx-auto text-center">
+          <div className="flex items-center justify-center gap-2 mb-8">
+            <div className="w-8 h-8 bg-brand rounded-lg flex items-center justify-center">
+              <span className="text-white font-serif font-bold text-sm leading-none">€</span>
+            </div>
+            <span className="font-serif text-xl text-navy">DutchClaim</span>
+          </div>
+          <div className="bg-white rounded-card p-8 shadow-card border border-navy/8">
+            <p className="font-serif text-xl text-navy mb-3">Session not found</p>
+            <p className="text-navy/55 text-sm leading-relaxed mb-6">
+              Your quiz answers couldn&apos;t be found — this usually happens when the confirmation email opens in a different browser. The quiz only takes 2 minutes to redo.
+            </p>
+            <Link
+              href="/scan"
+              className="inline-flex items-center gap-2 bg-brand text-white text-sm font-medium px-6 py-3 rounded-input w-full justify-center hover:bg-brand/90 transition-colors"
+            >
+              Redo the quiz <ArrowRight size={15} />
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Hydrating
+  if (hasScanData === null) {
     return (
       <div className="min-h-screen bg-[#E8DFD0] flex items-center justify-center">
         <div className="w-8 h-8 border-2 border-brand border-t-transparent rounded-full animate-spin" />
@@ -95,16 +127,18 @@ export default function PayPage() {
     )
   }
 
+  const details = PLAN_DETAILS[plan]
+
   return (
     <div className="bg-[#E8DFD0] min-h-screen py-16 px-4">
-      <div className="max-w-2xl mx-auto">
+      <div className="max-w-md mx-auto">
 
         <div className="text-center mb-10">
           <div className="flex items-center justify-center gap-2 mb-6">
             <div className="w-8 h-8 bg-brand rounded-lg flex items-center justify-center">
-              <span className="text-white font-serif font-bold">C</span>
+              <span className="text-white font-serif font-bold text-sm leading-none">€</span>
             </div>
-            <span className="font-serif text-xl text-navy">Claimly</span>
+            <span className="font-serif text-xl text-navy">DutchClaim</span>
           </div>
           <h1 className="font-serif text-3xl sm:text-4xl text-navy mb-3">
             Unlock your full report
@@ -114,71 +148,44 @@ export default function PayPage() {
           </p>
         </div>
 
-        <div className="grid sm:grid-cols-2 gap-4 mb-8">
-          {PLANS.map((plan) => (
-            <button
-              key={plan.id}
-              onClick={() => setSelectedPlan(plan.id as 'student' | 'full')}
-              className={`text-left rounded-card p-6 border-2 transition-all ${
-                selectedPlan === plan.id
-                  ? 'border-brand bg-white shadow-card-lg'
-                  : 'border-transparent bg-white/60 hover:bg-white/80'
-              }`}
-            >
-              {plan.highlight && (
-                <div className="inline-block bg-brand text-white text-xs font-medium px-2.5 py-0.5 rounded-full mb-3">
-                  Most popular
-                </div>
-              )}
-              <p className="text-sm font-medium text-brand mb-1">{plan.name}</p>
-              <div className="flex items-baseline gap-1.5 mb-4">
-                <span className="font-serif text-4xl text-navy">{plan.price}</span>
-                <span className="text-navy/45 text-sm">{plan.period}</span>
-              </div>
-              <ul className="space-y-2">
-                {plan.features.map((f) => (
-                  <li key={f} className="flex items-start gap-2 text-sm text-navy/70">
-                    <CheckCircle2 size={14} className="text-brand mt-0.5 shrink-0" />
-                    {f}
-                  </li>
-                ))}
-              </ul>
-              {selectedPlan === plan.id && (
-                <div className="mt-4 flex items-center gap-1.5 text-brand text-xs font-medium">
-                  <div className="w-3 h-3 rounded-full border-2 border-brand flex items-center justify-center">
-                    <div className="w-1.5 h-1.5 rounded-full bg-brand" />
-                  </div>
-                  Selected
-                </div>
-              )}
-            </button>
-          ))}
+        {/* Plan card */}
+        <div className="bg-white rounded-card border-2 border-brand p-6 mb-8 shadow-card-lg">
+          <p className="text-sm font-medium text-brand mb-1">{details.name}</p>
+          <div className="flex items-baseline gap-1.5 mb-4">
+            <span className="font-serif text-4xl text-navy">{details.price}</span>
+            <span className="text-navy/45 text-sm">one-time</span>
+          </div>
+          <ul className="space-y-2">
+            {details.features.map((f) => (
+              <li key={f} className="flex items-start gap-2 text-sm text-navy/70">
+                <CheckCircle2 size={14} className="text-brand mt-0.5 shrink-0" />
+                {f}
+              </li>
+            ))}
+          </ul>
         </div>
 
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-lg mb-5">
+          <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-lg mb-4">
             {error}
           </div>
         )}
 
-        <div className="text-center">
-          <button
-            onClick={handleUnlock}
-            disabled={loading}
-            className="btn-primary inline-flex items-center gap-2.5 bg-brand text-white font-medium px-8 py-3.5 rounded-input text-base disabled:opacity-60"
-          >
-            {loading ? (
-              <>
-                <Loader2 size={18} className="animate-spin" />
-                {status || 'Processing...'}
-              </>
-            ) : (
-              `Unlock ${selectedPlan === 'student' ? 'Student' : 'Expat'} Report · ${selectedPlan === 'student' ? '€13.99' : '€19.99'}`
-            )}
-          </button>
-          <p className="text-xs text-navy/35 mt-3">
-            Payment integration coming soon — unlocking free during beta.
-          </p>
+        <button
+          onClick={handleUnlock}
+          disabled={loading}
+          className="btn-primary inline-flex items-center gap-2.5 bg-brand text-white font-medium px-8 py-3.5 rounded-input text-base w-full justify-center disabled:opacity-60"
+        >
+          {loading
+            ? 'Redirecting to payment…'
+            : `Pay ${details.price} & unlock report`}
+        </button>
+
+        <div className="flex items-center justify-center gap-4 mt-4">
+          <span className="text-xs text-navy/35">Secured by</span>
+          <span className="text-xs font-semibold text-navy/40">Stripe</span>
+          <span className="text-xs text-navy/25">·</span>
+          <span className="text-xs text-navy/35">256-bit SSL</span>
         </div>
 
       </div>

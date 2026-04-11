@@ -37,6 +37,8 @@ export interface BenefitsPreEstimate {
 // Income bucket ordering (for threshold comparisons)
 // ─────────────────────────────────────────────────────────────────
 const INCOME_ORDER = [
+  'no_income',
+  'under_500',
   'under_1000',
   '1000_1500',
   '1500_2000',
@@ -68,13 +70,15 @@ function incomeAtOrBelow(income: string, threshold: string): boolean {
  * Source: proefberekening toeslagen 2025
  */
 const ZORGTOESLAG_BY_INCOME: Record<string, { min: number; max: number }> = {
+  no_income:   { min: 120, max: 123 }, // student on grants only — max amount
+  under_500:   { min: 118, max: 123 }, // very low income — near maximum
   under_1000:  { min: 118, max: 123 },
   '1000_1500': { min: 105, max: 118 },
   '1500_2000': { min:  88, max: 105 },
-  '2000_2500': { min:  63, max:  88 }, // ~€75 typical at €2,200/mo
-  '2500_3000': { min:  28, max:  63 }, // ~€40 typical at €2,750/mo
-  '3000_3500': { min:   5, max:  28 }, // single near cutoff; couple still gets ~€60
-  '3500_4500': { min:  45, max:  75 }, // couple only (single ineligible above €3,210/mo)
+  '2000_2500': { min:  63, max:  88 },
+  '2500_3000': { min:  28, max:  63 },
+  '3000_3500': { min:   5, max:  28 },
+  '3500_4500': { min:  45, max:  75 }, // couple only
   over_4500:   { min:  20, max:  45 }, // couple near upper threshold
   prefer_not:  { min:  50, max: 123 },
 }
@@ -194,6 +198,8 @@ export function estimateBenefits(data: ScanData): BenefitsPreEstimate {
   const programs: ProgramEstimate[] = []
   const country      = data.country     ?? 'NL'
   const income       = data.income      ?? 'prefer_not'
+  // Normalise student income ranges to the standard lowest bracket for table lookups
+  const lookupIncome = (income === 'no_income' || income === 'under_500') ? 'under_1000' : income
   const household    = data.household   ?? 'alone'
   const employment   = data.employment  ?? 'employed_full'
   const housing      = data.housing
@@ -207,16 +213,30 @@ export function estimateBenefits(data: ScanData): BenefitsPreEstimate {
     ? (children?.count === '4plus' ? 4 : parseInt(children?.count ?? '1'))
     : 0
 
-  // Opvang days scale factor (1–2 days ≈ 45%, 3–4 days ≈ 75%, 5 days = 100%)
+  // Opvang days scale factor (each day = 1/5 of full-time coverage)
   const opvangDays  = data.childrenOpvangDaysPerWeek
-  const daysScale   = opvangDays === '5' ? 1.0 : opvangDays === '3_4' ? 0.75 : opvangDays === '1_2' ? 0.45 : 1.0
+  const daysScale   = opvangDays ? parseInt(opvangDays) / 5 : 1.0
 
   // ── NETHERLANDS ──────────────────────────────────────────────
   if (country === 'NL') {
 
-    // 1. Zorgtoeslag — skip if user explicitly has no Dutch health insurance
+    // 1. Zorgtoeslag — requires Dutch basisverzekering, skip if explicitly no insurance
     const zorgThreshold = isCouple ? '3500_4500' : '3000_3500'
-    if (incomeAtOrBelow(income, zorgThreshold) && data.dutchHealthInsurance !== false) {
+    if (incomeAtOrBelow(income, zorgThreshold) && data.dutchHealthInsurance !== false && !isStudent) {
+      const row = ZORGTOESLAG_BY_INCOME[income] ?? ZORGTOESLAG_BY_INCOME.prefer_not
+      programs.push({
+        program_id:   'zorgtoeslag',
+        program_name: 'Healthcare Allowance',
+        dutch_name:   'Zorgtoeslag',
+        monthly_min:  row.min,
+        monthly_max:  row.max,
+        confidence:   income === 'prefer_not' ? 'possible' : 'likely',
+        source: 'belastingdienst.nl',
+      })
+    }
+
+    // 1b. Zorgtoeslag for students (separate gate: student must have Dutch health insurance)
+    if (isStudent && incomeAtOrBelow(income, '3000_3500') && data.dutchHealthInsurance !== false) {
       const row = ZORGTOESLAG_BY_INCOME[income] ?? ZORGTOESLAG_BY_INCOME.prefer_not
       programs.push({
         program_id:   'zorgtoeslag',
@@ -263,7 +283,7 @@ export function estimateBenefits(data: ScanData): BenefitsPreEstimate {
       const grid = HUURTOESLAG_GRID[housing.rent]
       if (grid) {
         const huurThreshold = isCouple ? '3500_4500' : '2500_3000'
-        const row = grid[income] as { min: number; max: number } | null
+        const row = grid[lookupIncome] as { min: number; max: number } | null
         if (row && incomeAtOrBelow(income, huurThreshold)) {
           programs.push({
             program_id:   'huurtoeslag',
@@ -280,7 +300,7 @@ export function estimateBenefits(data: ScanData): BenefitsPreEstimate {
 
     // 5. Kinderopvangtoeslag — scaled by days per week
     if (hasKids && children?.paidChildcare) {
-      const row   = KOT_BY_INCOME[income] ?? KOT_BY_INCOME.prefer_not
+      const row   = KOT_BY_INCOME[lookupIncome] ?? KOT_BY_INCOME.prefer_not
       const scale = Math.min(childCount, 2)
       programs.push({
         program_id:   'kinderopvangtoeslag',
@@ -297,7 +317,7 @@ export function estimateBenefits(data: ScanData): BenefitsPreEstimate {
     if (hasKids && childCount > 0) {
       const kgbThreshold = isSingleParent ? '3000_3500' : '3500_4500'
       if (incomeAtOrBelow(income, kgbThreshold)) {
-        const row = KGB_BY_INCOME[income] ?? KGB_BY_INCOME.prefer_not
+        const row = KGB_BY_INCOME[lookupIncome] ?? KGB_BY_INCOME.prefer_not
         const perChild = isSingleParent
           ? Math.round(row.base * row.single_multiplier)
           : row.base
@@ -314,9 +334,12 @@ export function estimateBenefits(data: ScanData): BenefitsPreEstimate {
       }
     }
 
-    // 7. WW-uitkering (unemployed non-students only)
-    if (employment === 'unemployed' && !isStudent) {
-      const row = WW_BY_INCOME[income] ?? WW_BY_INCOME.prefer_not
+    // 7. WW-uitkering (unemployed non-students only, must not have quit voluntarily, must have 26+ weeks work history)
+    const wwEligible = employment === 'unemployed' && !isStudent
+      && data.jobLossReason !== 'quit'
+      && data.workedSixMonths !== false
+    if (wwEligible) {
+      const row = WW_BY_INCOME[lookupIncome] ?? WW_BY_INCOME.prefer_not
       programs.push({
         program_id:   'ww_uitkering',
         program_name: 'Unemployment Benefit',
@@ -328,7 +351,22 @@ export function estimateBenefits(data: ScanData): BenefitsPreEstimate {
       })
     }
 
-    // 8. Bijstandsuitkering — last resort
+    // 8. Kinderbijslag (AKW) — no income test, applies to virtually all parents working in NL
+    // Rates 2025: ~€93/mo per child (avg across age bands: 0–5 €93, 6–11 €113, 12–17 €133)
+    if (hasKids && childCount > 0 && !isStudent) {
+      const perChild = 100 // conservative flat average (SVB pays quarterly; ~€300/quarter)
+      programs.push({
+        program_id:   'kinderbijslag',
+        program_name: 'Child Benefit',
+        dutch_name:   'Kinderbijslag (AKW)',
+        monthly_min:  perChild * childCount,
+        monthly_max:  Math.round(perChild * 1.35 * childCount), // higher for older children
+        confidence:   'likely',
+        source: 'svb.nl',
+      })
+    }
+
+    // 9. Bijstandsuitkering — last resort
     if (employment === 'unemployed' && !isStudent && incomeAtOrBelow(income, '1500_2000')) {
       programs.push({
         program_id:   'bijstandsuitkering',

@@ -79,19 +79,19 @@ const NL_BENEFITS = [
 
 const TESTIMONIALS = [
   {
-    quote: "Nobody told me about zorgtoeslag or huurtoeslag — I thought those were only for Dutch people. Claimly found €463/month I'd been missing.",
+    quote: "Nobody told me about zorgtoeslag or huurtoeslag — I thought those were only for Dutch people. DutchClaim found €463/month I'd been missing.",
     name: 'Marta W.',
     role: 'Logistics coordinator, Rotterdam',
     flag: '🇵🇱',
   },
   {
-    quote: "My wife and I moved from Texas for my job. We had no idea the Dutch government offers rent and healthcare support for expat families. Claimly walked us through everything.",
+    quote: "My wife and I moved from Texas for my job. We had no idea the Dutch government offers rent and healthcare support for expat families. DutchClaim walked us through everything.",
     name: 'James H.',
     role: 'Product manager + family, Amsterdam',
     flag: '🇺🇸',
   },
   {
-    quote: "As a student at TU Delft I didn't know I could get zorgtoeslag — and Claimly flagged DUO grants I hadn't fully claimed. €890/mo I almost missed.",
+    quote: "As a student at TU Delft I didn't know I could get zorgtoeslag — and DutchClaim flagged DUO grants I hadn't fully claimed. €890/mo I almost missed.",
     name: 'Lukas B.',
     role: 'MSc student, Delft',
     flag: '🇩🇪',
@@ -151,10 +151,10 @@ export default function Home() {
             style={{ animationDelay: '0.25s' }}
           >
             {[
-              { value: '€1B+',   label: 'unclaimed per year' },
-              { value: '1 in 10', label: 'never claim' },
-              { value: '8',      label: 'programs checked' },
-              { value: '2 min',  label: 'to get results' },
+              { value: '€3,200',  label: 'avg missed per worker per year' },
+              { value: '3 months', label: 'backdated — don\'t wait' },
+              { value: '4.5M',    label: 'Dutch residents actively claiming' },
+              { value: '2 min',   label: 'free check, right now, in English' },
             ].map((s) => (
               <div key={s.value} className="bg-white/60 px-2 sm:px-4 py-4">
                 <p className="font-serif text-xl sm:text-2xl text-brand mb-0.5">{s.value}</p>
@@ -178,9 +178,9 @@ export default function Home() {
           </div>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
             {[
-              { step: '1', icon: <FileText size={18} />, title: 'Tell us your situation', desc: 'A few quick questions about your status, income, and family. In English.' },
-              { step: '2', icon: <Zap size={18} />, title: 'We check every program', desc: 'AI scans all 8 Dutch benefit programs against your profile using 2025/2026 rules.' },
-              { step: '3', icon: <CheckCircle2 size={18} />, title: 'See what you\'re owed', desc: 'Plain-English report with each benefit, monthly amount, and direct apply link.' },
+              { step: '1', icon: <FileText size={18} />, title: 'Answer 8 simple questions', desc: 'Your income, your rent, your family setup. In plain English. No Dutch, no DigiD, no documents.' },
+              { step: '2', icon: <Zap size={18} />, title: 'We scan every program automatically', desc: 'DutchClaim checks all 8 Dutch benefit programs against your exact situation using the latest 2025/2026 government rules. Takes seconds.' },
+              { step: '3', icon: <CheckCircle2 size={18} />, title: 'Get your personal money report', desc: 'See exactly which benefits you qualify for, how much each one pays monthly, and a direct link to apply. No translation needed.' },
             ].map((item, i) => (
               <div
                 key={item.step}
@@ -207,9 +207,9 @@ export default function Home() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-8 sm:mb-12">
             <p className="text-brand text-sm font-semibold uppercase tracking-wider mb-3">Benefits covered</p>
-            <h2 className="font-serif text-2xl sm:text-4xl text-navy mb-2">Every program, automatically checked</h2>
+            <h2 className="font-serif text-2xl sm:text-4xl text-navy mb-2">Every euro you&apos;re entitled to — in one scan</h2>
             <p className="text-navy/60 text-sm max-w-sm mx-auto">
-              8 programs — expat and student — all scanned in one go.
+              8 programs — workers and students — all scanned in one go.
             </p>
           </div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
@@ -272,9 +272,9 @@ export default function Home() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-10 sm:mb-12">
             <p className="text-brand text-sm font-semibold uppercase tracking-wider mb-3">Pricing</p>
-            <h2 className="font-serif text-2xl sm:text-4xl text-navy mb-3">Your scan is always free.</h2>
+            <h2 className="font-serif text-2xl sm:text-4xl text-navy mb-3">Free to scan. Pay only when you find something worth claiming.</h2>
             <p className="text-navy/60 text-sm max-w-sm mx-auto">
-              Pay once to unlock the full AI-verified report. No subscription, ever.
+              No subscription, ever. One-time payment to unlock your full personalised report.
             </p>
           </div>
           <PricingTabs />
@@ -289,11 +289,10 @@ export default function Home() {
             <TrendingUp size={20} className="text-brand" />
           </div>
           <h2 className="font-serif text-2xl sm:text-4xl text-navy mb-4">
-            You moved here. The benefits system didn&apos;t send you a welcome letter.
+            The Dutch government set aside money for you. They just didn&apos;t make it easy to find.
           </h2>
           <p className="text-navy/55 text-sm sm:text-lg mb-8 leading-relaxed">
-            Most expats in the Netherlands miss €3,200+ per year they&apos;re fully entitled to.
-            The system is in Dutch and nobody explains it. Check yours free in 2 minutes.
+            €1 billion goes unclaimed here every year — not because people don&apos;t deserve it, but because nobody showed them where to look. That&apos;s what DutchClaim is for. Two minutes, free, in English.
           </p>
           <Link
             href="/scan"
